@@ -1,7 +1,7 @@
 .vscode/
 bin/*.exe
-include/
-lib/
+# include/
+# lib/
 src/sb7
 CMakeFiles/
 cmake_install.cmake_install
