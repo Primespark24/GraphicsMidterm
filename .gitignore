@@ -1,0 +1,13 @@
+.vscode/
+bin/*.exe
+include/
+lib/
+src/sb7
+CMakeFiles/
+cmake_install.cmake_install
+cmake_install.cmake
+CmakeCache.txt
+# CmakeLists.txt
+Makefile
+# ProjectRefresh.bat
+# .gitignore
