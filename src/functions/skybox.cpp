@@ -44,12 +44,12 @@ void subPoints(int a, int b, int c, int d,std::vector<vmath::vec4> &vertices){
 
 void loadCubeTextures(std::string directory, GLuint texture_ID){
     //Load each side in from the file
-    loadCubeSide(texture_ID, GL_TEXTURE_CUBE_MAP_POSITIVE_Z, directory+".\\panorama_0.bmp");
-    loadCubeSide(texture_ID, GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, directory+".\\panorama_2.bmp");
-    loadCubeSide(texture_ID, GL_TEXTURE_CUBE_MAP_POSITIVE_Y, directory+".\\panorama_5.bmp");
-    loadCubeSide(texture_ID, GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, directory+".\\panorama_4.bmp");
-    loadCubeSide(texture_ID, GL_TEXTURE_CUBE_MAP_POSITIVE_X, directory+".\\panorama_1.bmp");
-    loadCubeSide(texture_ID, GL_TEXTURE_CUBE_MAP_NEGATIVE_X, directory+".\\panorama_3.bmp");
+    loadCubeSide(texture_ID, GL_TEXTURE_CUBE_MAP_POSITIVE_Z, directory+".\\82_panorama_1_24.bmp");
+    loadCubeSide(texture_ID, GL_TEXTURE_CUBE_MAP_NEGATIVE_Z, directory+".\\82_panorama_3_24.bmp");
+    loadCubeSide(texture_ID, GL_TEXTURE_CUBE_MAP_POSITIVE_Y, directory+".\\82_panorama_5_24.bmp");
+    loadCubeSide(texture_ID, GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, directory+".\\82_panorama_0_24.bmp");
+    loadCubeSide(texture_ID, GL_TEXTURE_CUBE_MAP_POSITIVE_X, directory+".\\82_panorama_2_24.bmp");
+    loadCubeSide(texture_ID, GL_TEXTURE_CUBE_MAP_NEGATIVE_X, directory+".\\82_panorama_4_24.bmp");
 
     // Set standard parameters for the cube map texture mapping
     glTexParameteri( GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR );
