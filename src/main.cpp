@@ -54,10 +54,7 @@ class test_app : public sb7::application{
         //Also notice this could be automated / streamlined with a list of objects to load
 
         //Load four objects
-        load_obj(".\\bin\\media\\shield.obj", objects[0].verticies, objects[0].uv, objects[0].normals, objects[0].vertNum);
-        load_obj(".\\bin\\media\\sword.obj", objects[1].verticies, objects[1].uv, objects[1].normals, objects[1].vertNum);
-        load_obj(".\\bin\\media\\pickaxe.obj", objects[2].verticies, objects[2].uv, objects[2].normals, objects[2].vertNum);
-        load_obj(".\\bin\\media\\bucket.obj", objects[3].verticies, objects[3].uv, objects[3].normals, objects[3].vertNum);
+        load_obj(".\\bin\\media\\cube.obj", objects[0].verticies, objects[0].uv, objects[0].normals, objects[0].vertNum);
 
         ////////////////////////////////
         //Set up Object Scene Shaders //
@@ -228,31 +225,9 @@ class test_app : public sb7::application{
 
         //Set up obj->world transforms for each object (these could be modified for animation)
 
-        //shield that circles around sword to protect it
+        //cube that floats up and down
         objects[0].obj2world = 
-            vmath::rotate(90.0f, 1.0f, 0.0f, 0.0f) * //rotate so shield is not facing upwards
-            vmath::rotate(100.0f * static_cast<float>(curTime), 0.0f, 0.0f, 1.0f) *
-            vmath::translate(0.0f, 1.0f, 0.0f); // translate for object0
-
-        //sword that floats up and down (because being stationary is boring!)
-        objects[1].obj2world = 
-            // vmath::mat4::identity() * 
-            vmath::scale(0.2f) * 
-            vmath::translate(0.0f, static_cast<float>(cos(curTime)) - 1.5f, 0.0f);
-
-        //pickaxe that mines constantly
-        objects[2].obj2world = 
-            // vmath::mat4::identity() * 
-            vmath::scale(0.6f) * 
-            vmath::translate(5.0f, 0.4f, 3.0f) *
-            vmath::rotate(25.0f + 25.0f * static_cast<float>(cos(6.0 * curTime)), 0.0f, 0.0f, 1.0f);
-
-        //bucket that keeps getting poured
-        objects[3].obj2world = 
-            // vmath::mat4::identity() * 
-            vmath::scale(0.6f) * 
-            vmath::translate(-5.0f, 3.0f, -3.0f) *
-            vmath::rotate(50.0f + 50.0f * static_cast<float>(cos(3.0 * curTime)), 1.0f, 0.0f, 0.0f);
+            vmath::mat4::identity();
 
         for(int i = 0; i < objects.size(); i++ ){
             //render loop, go through each object and render it!
