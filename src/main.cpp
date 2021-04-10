@@ -1,11 +1,13 @@
 /*
- * Based on work by Graham Sellers and OpenGL SuperBible7
+ * Kyle Shepard and Brycen Martin
+ * 
+ * Midterm Project - MC Maze
+ * 
+ * Based on work by Graham Sellers and OpenGL SuperBible7 and Scott Griffith
  * Also: https://en.wikibooks.org/wiki/OpenGL_Programming/Modern_OpenGL_Tutorial_Load_OBJ
  *       http://www.opengl-tutorial.org/beginners-tutorials/tutorial-7-model-loading/ 
  *       https://antongerdelan.net/opengl/cubemaps.html
- * 
- * Goal is to load a skycube and two objects (with the possibility of loading more objects)
- * 
+ *       https://learnopengl.com/Getting-started/Camera
  */
 
 #include <sb7.h>
@@ -285,6 +287,7 @@ class test_app : public sb7::application{
         calcProjection(camera); 
     }
 
+    //adapted from https://learnopengl.com/Getting-started/Camera
     void onMouseMove(int x, int y){
         if (first_mouse)
         {
