@@ -43,9 +43,9 @@ class test_app : public sb7::application{
         // Load Object Info //
         //////////////////////
         objects.push_back(obj_t()); //Push one new object into the vector list
-        objects.push_back(obj_t()); //Push second new object into the vector list
-        objects.push_back(obj_t()); //Push third new object into the vector list
-        objects.push_back(obj_t()); //Push fourth new object into the vector list
+        // objects.push_back(obj_t()); //Push second new object into the vector list
+        // objects.push_back(obj_t()); //Push third new object into the vector list
+        // objects.push_back(obj_t()); //Push fourth new object into the vector list
         // This program is set up to load multiple *different* objects
         // If you wanted to decouple the data for objects from the transforms for object, it would be beneficial to 
         // have two cooperative structs. One would hold the vertex data, the other would reference that data with 
@@ -159,8 +159,14 @@ class test_app : public sb7::application{
         camera.fovy       = 67.0f; //Field of view in the y direction (x defined by aspect)
         //Initial camera details
         camera.position = vmath::vec3(0.0f, 0.0f, 5.0f); //Starting camera at position (0,0,5)
-        camera.direction = vmath::vec3(0.0f, 0.0f, -1.0f); //Camera is looking at origin
+        camera.forward = vmath::vec3(0.0f, 0.0f, -1.0f); //Camera is looking at origin
+        camera.up = vmath::vec3(0.0f, 1.0f, 0.0f); //Camera is looking at origin
+        pitch = 0.0f;
+        yaw = -90.0f;
+
         
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); 
+
         move_speed = 0.2f;
         pan_speed = 0.2f;
 
@@ -279,6 +285,40 @@ class test_app : public sb7::application{
         calcProjection(camera); 
     }
 
+    void onMouseMove(int x, int y){
+        if (first_mouse)
+        {
+            last_x = x;
+            last_y = y;
+            first_mouse = false;
+        }
+    
+        float xoffset = static_cast<float>(x - last_x);
+        float yoffset = static_cast<float>(last_y - y); 
+        last_x = x;
+        last_y = y;
+
+        float sensitivity = 0.1f;
+        xoffset *= sensitivity;
+        yoffset *= sensitivity;
+
+        yaw   += xoffset;
+        pitch += yoffset;
+
+        if(pitch > 89.0f)
+            pitch = 89.0f;
+        if(pitch < -89.0f)
+            pitch = -89.0f;
+
+        camera.forward = vmath::normalize(
+            vmath::vec3(
+                cos(vmath::radians(yaw)) * cos(vmath::radians(pitch)),
+                sin(vmath::radians(pitch)),
+                sin(vmath::radians(yaw)) * cos(vmath::radians(pitch))
+            )
+        );
+    }
+
     void onKey(int key, int action) {
         //If something did happen
         if (action) {
@@ -291,30 +331,31 @@ class test_app : public sb7::application{
                 // G -x cameraFocus  H -y cameraFocus  J -z cameraFocus
 
                 case 'W': //go toward camera direction 
-                    camera.position += camera.direction * move_speed;
+                    camera.position += camera.advance(move_speed);
                     break;
                 case 'A': //strafe left of camera direction
-                    camera.position += vmath::vec3(camera.direction[2], 0.0f, camera.direction[0]) * move_speed;
+                    camera.position -= camera.strafe(move_speed);
                     break;
                 case 'S': //back away from camera direction 
-                    camera.position -= camera.direction * move_speed;
+                    camera.position -= camera.advance(move_speed);
                     break;
                 case 'D': //strafe right of camera direction 
-                    camera.position -= vmath::vec3(camera.direction[2], 0.0f, camera.direction[0]) * move_speed;
+                    camera.position += camera.strafe(move_speed);
                     break;
                 //really hack-y ways to get basic camera direction vector working without support of vector/matrix multiplication support in vmath
-                case GLFW_KEY_UP:
-                    camera.direction = vmath::normalize(vmath::vec3(camera.direction[0], camera.direction[1] + pan_speed, camera.direction[2]));
-                    break;
-                case GLFW_KEY_DOWN:
-                    camera.direction = vmath::normalize(vmath::vec3(camera.direction[0], camera.direction[1] - pan_speed, camera.direction[2]));
-                    break;
-                case GLFW_KEY_LEFT:
-                    camera.direction = vmath::normalize(vmath::vec3(camera.direction[0] - pan_speed, camera.direction[1], camera.direction[2]));
-                    break;
-                case GLFW_KEY_RIGHT:
-                    camera.direction = vmath::normalize(vmath::vec3(camera.direction[0] + pan_speed, camera.direction[1], camera.direction[2]));
-                    break;
+                // case GLFW_KEY_UP:
+                //     // camera.forward = vmath::rotate()
+                //     camera.forward = vmath::normalize(vmath::vec3(camera.forward[0], camera.forward[1] + pan_speed, camera.forward[2]));
+                //     break;
+                // case GLFW_KEY_DOWN:
+                //     camera.forward = vmath::normalize(vmath::vec3(camera.forward[0], camera.forward[1] - pan_speed, camera.forward[2]));
+                //     break;
+                // case GLFW_KEY_LEFT:
+                //     camera.forward = vmath::normalize(vmath::vec3(camera.forward[0] - pan_speed, camera.forward[1], camera.forward[2]));
+                //     break;
+                // case GLFW_KEY_RIGHT:
+                //     camera.forward = vmath::normalize(vmath::vec3(camera.forward[0] + pan_speed, camera.forward[1], camera.forward[2]));
+                //     break;
                 case 'C':
                     autoRotate = !autoRotate;
                     break;
@@ -324,9 +365,12 @@ class test_app : public sb7::application{
                     break;
                 case 'X': //Info
                     char buf[50];
-                    sprintf(buf, "Current Camera Pos:(%.3f,%.3f,%.3f) Focus:(%.3f,%.3f,%.3f)",
+                    sprintf(buf, "Current Camera Pos:(%.3f,%.3f,%.3f)\nForward:(%.3f,%.3f,%.3f)\nUp:(%.3f,%.3f,%.3f)\nPitch:%.3f Yaw:%.3f",
                                        camera.position[0],camera.position[1],camera.position[2],
-                                       camera.direction[0],camera.direction[1],camera.direction[2]);
+                                       camera.forward[0],camera.forward[1],camera.forward[2],
+                                       camera.up[0], camera.up[1], camera.up[2],
+                                       pitch, yaw
+                                    );
                     MessageBoxA(NULL, buf, "Diagnostic Printout", MB_OK);
                     break;
                 case 'M': //Info
@@ -428,6 +472,13 @@ class test_app : public sb7::application{
         GLfloat move_speed;
         GLfloat pan_speed;
 
+        GLfloat pitch;
+        GLfloat yaw;
+
+        GLint last_x;
+        GLint last_y;
+        bool first_mouse;
+
         bool autoRotate = false;
 
         // Camera Stuff
@@ -436,14 +487,26 @@ class test_app : public sb7::application{
             float camera_far;    //Far clipping mask
             float fovy;          //Field of View in y
             float aspect;        //Aspect ratio (w/h)
+            float pitch;
+            float yaw;
             vmath::mat4 proj_Matrix; //Collection of the above
 
             vmath::vec3 position; //Current world coordinates of the camera
-            vmath::vec3 direction; //Current unit vector of direction of the camera
+            vmath::vec3 forward; //unit vector of forward direction of the camera
+            vmath::vec3 up; //unit vector of up direction of the camera
             //TODO:: Maybe we just want to use euler angles here
 
             vmath::mat4 view_mat; //World to Camera matrix
             vmath::mat4 view_mat_no_translation; //World to Camera matrix with no translation
+
+            vmath::vec3 advance(GLfloat move_speed){
+                return vmath::normalize(vmath::vec3(forward[0], 0.0f, forward[2])) * move_speed;
+            }
+
+            vmath::vec3 strafe(GLfloat move_speed){
+                vmath::vec3 direction = vmath::cross(forward, up);
+                return vmath::normalize(vmath::vec3(direction[0], 0.0f, direction[2])) * move_speed;
+            }
         } camera;
 
         //Utility to update project matrix and view matrix of a camera_t
@@ -453,7 +516,8 @@ class test_app : public sb7::application{
         }
 
         void calcView(camera_t &cur){
-            cur.view_mat = vmath::lookat(cur.position, cur.position + cur.direction, vmath::vec3(0.0f, 1.0f, 0.0f)); //Based on position and focus location
+
+            cur.view_mat = vmath::lookat(cur.position, cur.position + cur.forward, vmath::vec3(0.0f, 1.0f, 0.0f)); //Based on position and focus location
             cur.view_mat_no_translation = cur.view_mat;   
             //Removing the tranlational elements for skybox         
             cur.view_mat_no_translation[3][0] = 0;
