@@ -11,7 +11,7 @@
 
 // filename - Blender .obj file (see file formatting specifics above)
 // All vectors passed by reference and filled in function
-// vertices - list of, in order, verticies for object. In triangles
+// vertices - list of, in order, vertices for object. In triangles
 // UVs - Texture mapping coordinates, indexed with the above vertices
 // normals - index with the above vertices
 // number - Total number of points in vertices (should be vertices.length())
@@ -54,7 +54,7 @@ void load_obj(const char* filename, std::vector<vmath::vec4> &vertices, std::vec
             tVec[1] = stof(parseAndClip(sub," "));
             tVec[2] = stof(parseAndClip(sub," "));
             
-            //Push vec4 onto verticies vector
+            //Push vec4 onto vertices vector
             tempVert.push_back(tVec);
             
         } else if (line.substr(0,2) == "f ") {
