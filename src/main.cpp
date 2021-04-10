@@ -585,7 +585,7 @@ class test_app : public sb7::application{
 
         void calcView(camera_t &cur){
 
-            cur.view_mat = vmath::lookat(cur.position, cur.position + cur.forward, vmath::vec3(0.0f, 1.0f, 0.0f)); //Based on position and focus location
+            cur.view_mat = vmath::lookat(cur.position, autoRotate ? vmath::vec3(0.0f, 0.0f, 0.0f) : cur.position + cur.forward, vmath::vec3(0.0f, 1.0f, 0.0f)); //Based on position and focus location
             cur.view_mat_no_translation = cur.view_mat;   
             //Removing the tranlational elements for skybox         
             cur.view_mat_no_translation[3][0] = 0;
