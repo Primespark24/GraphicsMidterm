@@ -42,6 +42,7 @@ add_library(sb7
             src/sb7/gl3w.c
             src/functions/loadingFunctions.cpp
             src/functions/skybox.cpp
+            src/functions/vectorFunctions.cpp
 )
 
 set(RUN_DIR ${PROJECT_SOURCE_DIR}/bin)
