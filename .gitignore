@@ -1,6 +1,6 @@
 .vscode/
 bin/*.exe
-include/
+# include/
 lib/
 src/sb7
 CMakeFiles/

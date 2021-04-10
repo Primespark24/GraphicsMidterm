@@ -10,9 +10,13 @@
  *       https://learnopengl.com/Getting-started/Camera
  */
 
+#include <vectorFunctions.h>
 #include <sb7.h>
 #include <shader.h>
 #include <vmath.h>
+#include <algorithm>
+#include <sstream>
+#include <iostream>
 
 #include <loadingFunctions.h>
 #include <skybox.h>
@@ -32,7 +36,7 @@ class test_app : public sb7::application{
 
     void init(){
         // Set up appropriate title
-        static const char title[] = "Fake Minecraft";
+        static const char title[] = "Collision Test";
         sb7::application::init();
         memcpy(info.title, title, sizeof(title));
 
@@ -44,7 +48,7 @@ class test_app : public sb7::application{
         //////////////////////
         // Load Object Info //
         //////////////////////
-        objects.push_back(obj_t()); //Push one new object into the vector list
+         //Push one new object into the vector list
         // objects.push_back(obj_t()); //Push second new object into the vector list
         // objects.push_back(obj_t()); //Push third new object into the vector list
         // objects.push_back(obj_t()); //Push fourth new object into the vector list
@@ -55,8 +59,16 @@ class test_app : public sb7::application{
 
         //Also notice this could be automated / streamlined with a list of objects to load
 
-        //Load four objects
-        load_obj(".\\bin\\media\\cube.obj", objects[0].verticies, objects[0].uv, objects[0].normals, objects[0].vertNum);
+        int num_cubes = 4;
+
+        for(int i = 0; i < num_cubes; i++){
+            // generate new cube
+            objects.push_back(obj_t());
+            load_obj(".\\bin\\media\\cube.obj", objects[i].vertices, objects[i].uv, objects[i].normals, objects[i].vertNum);
+
+            //test place in line
+            objects[i].world_origin = vmath::vec3(static_cast<float>(2 * i), 0.0f, 0.0f);
+        }
 
         ////////////////////////////////
         //Set up Object Scene Shaders //
@@ -87,10 +99,33 @@ class test_app : public sb7::application{
             glGenBuffers(1,&objects[i].vertices_buffer_ID); //Create the buffer id for this object
             glBindBuffer( GL_ARRAY_BUFFER, objects[i].vertices_buffer_ID);
             glBufferData( GL_ARRAY_BUFFER,
-                objects[i].verticies.size() * sizeof(objects[i].verticies[0]), //Size of element * number of elements
-                objects[i].verticies.data(),                                   //Actual data
+                objects[i].vertices.size() * sizeof(objects[i].vertices[0]), //Size of element * number of elements
+                objects[i].vertices.data(),                                   //Actual data
                 GL_STATIC_DRAW);                                               //Set to static draw (read only)  
-           
+
+            //calculate and store bounding box
+            std::vector<float> xs;
+            std::vector<float> zs;
+
+            for(int j = 0; j < objects[i].vertices.size(); j++){
+                xs.push_back(objects[i].vertices[j][0]);
+                zs.push_back(objects[i].vertices[j][2]);
+            }
+
+            //check vector contents
+            // errorBoxString(toString(xs));
+            // errorBoxString(toString(zs));
+
+            std::tuple<float, float> xMinMax = minMax(xs);
+            std::tuple<float, float> zMinMax = minMax(zs);
+
+            // std::ostringstream oss;
+            // oss << std::get<1>(xMinMax);
+            // errorBoxString(oss.str());
+
+            objects[i].min = vmath::vec2(std::get<0>(xMinMax), std::get<0>(zMinMax));
+            objects[i].max = vmath::vec2(std::get<1>(xMinMax), std::get<1>(zMinMax));
+            
             //If we needed to load the UVs or Normals, this would be where.
         }
         
@@ -232,12 +267,14 @@ class test_app : public sb7::application{
         /////////////////////////////////////////////////////////////////////////////////
 
         //Set up obj->world transforms for each object (these could be modified for animation)
-
-        //cube that floats up and down
-        objects[0].obj2world = 
-            vmath::mat4::identity();
+        
+        // objects[0].world_origin = vmath::vec3(static_cast<float>(cos(curTime)), 0.0f, static_cast<float>(sin(curTime)));
+        
 
         for(int i = 0; i < objects.size(); i++ ){
+            objects[i].obj2world = 
+                vmath::mat4::identity() * 
+                vmath::translate(objects[i].world_origin);
             //render loop, go through each object and render it!
             glUseProgram(rendering_program); //activate the render program
             glBindVertexArray(vertex_array_object); //Select base vao
@@ -259,7 +296,7 @@ class test_app : public sb7::application{
                     0,         //No stride (steps between indexes)
                     0);       //initial offset
 
-            glDrawArrays( GL_TRIANGLES, 0, objects[i].verticies.size());
+            glDrawArrays( GL_TRIANGLES, 0, objects[i].vertices.size());
         }
 
         runtime_error_check(4);
@@ -312,7 +349,7 @@ class test_app : public sb7::application{
             pitch = 89.0f;
         if(pitch < -89.0f)
             pitch = -89.0f;
-
+        pitch = 0.0f; // filter out y so it doesn't look broken ;)
         camera.forward = vmath::normalize(
             vmath::vec3(
                 cos(vmath::radians(yaw)) * cos(vmath::radians(pitch)),
@@ -322,43 +359,50 @@ class test_app : public sb7::application{
         );
     }
 
+    //before moving check if collision will happen. if so, just stop
+    void move(vmath::vec3 direction, short sign){
+        //do collision detection
+        //iterate through all walls
+        vmath::vec3 dest = camera.position + direction;
+        float dest_x = dest[0];
+        float dest_z = dest[2];
+
+        bool collides = false;
+        float player_width = 0.5f;
+
+        for(int i = 0; i < objects.size(); i++){
+            float min_x = objects[i].min[0] + objects[i].world_origin[0];
+            float max_x = objects[i].max[0] + objects[i].world_origin[0];
+            float min_z = objects[i].min[1] + objects[i].world_origin[2];
+            float max_z = objects[i].max[1] + objects[i].world_origin[2];
+            if(((dest_x) < max_x + player_width) && (dest_x > min_x - player_width) && 
+                ((dest_z) < max_z + player_width) && (dest_z > min_z - player_width)) { //if x + z collides
+                collides = true; 
+                break;
+            }
+        }
+        if(!collides){
+            camera.position += (direction * sign);
+        }
+    }
+
     void onKey(int key, int action) {
         //If something did happen
         if (action) {
             switch (key) { //Select an action
-                // Q +x cameraPos  W +y cameraPos  E +z cameraPos
-                // A -x cameraPos  S -y cameraPos  D -z cameraPos
-                // Z - Reset to default X Diagnostic Printout
-                // C - toggle auto rotate flag
-                // T +x cameraFocus  Y +y cameraFocus  U +z cameraFocus
-                // G -x cameraFocus  H -y cameraFocus  J -z cameraFocus
-
                 case 'W': //go toward camera direction 
-                    camera.position += camera.advance(move_speed);
+                    // camera.position += camera.advance(move_speed);
+                    move(camera.advance(move_speed), 1);
                     break;
                 case 'A': //strafe left of camera direction
-                    camera.position -= camera.strafe(move_speed);
+                    move(camera.strafe(move_speed), -1);
                     break;
                 case 'S': //back away from camera direction 
-                    camera.position -= camera.advance(move_speed);
+                    move(camera.advance(move_speed), -1);
                     break;
                 case 'D': //strafe right of camera direction 
-                    camera.position += camera.strafe(move_speed);
+                    move(camera.strafe(move_speed), 1);
                     break;
-                //really hack-y ways to get basic camera direction vector working without support of vector/matrix multiplication support in vmath
-                // case GLFW_KEY_UP:
-                //     // camera.forward = vmath::rotate()
-                //     camera.forward = vmath::normalize(vmath::vec3(camera.forward[0], camera.forward[1] + pan_speed, camera.forward[2]));
-                //     break;
-                // case GLFW_KEY_DOWN:
-                //     camera.forward = vmath::normalize(vmath::vec3(camera.forward[0], camera.forward[1] - pan_speed, camera.forward[2]));
-                //     break;
-                // case GLFW_KEY_LEFT:
-                //     camera.forward = vmath::normalize(vmath::vec3(camera.forward[0] - pan_speed, camera.forward[1], camera.forward[2]));
-                //     break;
-                // case GLFW_KEY_RIGHT:
-                //     camera.forward = vmath::normalize(vmath::vec3(camera.forward[0] + pan_speed, camera.forward[1], camera.forward[2]));
-                //     break;
                 case 'C':
                     autoRotate = !autoRotate;
                     break;
@@ -388,6 +432,24 @@ class test_app : public sb7::application{
             }
         }
 
+    }
+
+    void errorBoxString(std::string str){
+        char buf[str.length()];
+        strcpy(buf, str.c_str());
+        MessageBoxA(NULL, buf, "Diagnostic Printout", MB_OK);
+    }
+
+    void errorBox(const char* msg){
+        char buf[50];
+        strcpy(buf, msg);
+        // sprintf(buf, "Current Camera Pos:(%.3f,%.3f,%.3f)\nForward:(%.3f,%.3f,%.3f)\nUp:(%.3f,%.3f,%.3f)\nPitch:%.3f Yaw:%.3f",
+        //                     camera.position[0],camera.position[1],camera.position[2],
+        //                     camera.forward[0],camera.forward[1],camera.forward[2],
+        //                     camera.up[0], camera.up[1], camera.up[2],
+        //                     pitch, yaw
+        //                 );
+        MessageBoxA(NULL, buf, "Diagnostic Printout", MB_OK);
     }
 
     void runtime_error_check(GLuint tracker = 0)
@@ -442,9 +504,12 @@ class test_app : public sb7::application{
         //Structure to hold all the object info
         struct obj_t{
             //Data for object loaded from file
-            std::vector<vmath::vec4> verticies;
+            std::vector<vmath::vec4> vertices;
             std::vector<vmath::vec4> normals;
             std::vector<vmath::vec2> uv;
+            vmath::vec3 world_origin;
+            vmath::vec2 max; //maximum x and z values
+            vmath::vec2 min; //minimum x and z values
             GLuint vertNum; //This should be the same as vertivies.size()
 
             //Handle from OpenGL set up
