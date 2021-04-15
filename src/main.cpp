@@ -17,9 +17,11 @@
 #include <algorithm>
 #include <sstream>
 #include <iostream>
+#include <ctime>
 
 #include <loadingFunctions.h>
 #include <skybox.h>
+#include <maze.h>
 
 //Needed for file loading (also vector)
 #include <string>
@@ -31,6 +33,111 @@
 #define GL_CHECK_ERRORS assert(glGetError()== GL_NO_ERROR);
 
 class test_app : public sb7::application{
+
+    private:
+        //Scene Rendering Information
+        GLuint rendering_program; //Program reference for scene generation
+        GLuint vertex_array_object;
+        
+        //Uniform attributes for Scene Render
+        GLuint transform_ID; //Dynamic transform of object
+        GLuint perspec_ID;   //Perspective transform
+        GLuint toCam_ID;     //World to Camera transform
+        GLuint vertex_ID;    //This will be mapped to different objects as we load them
+
+        // Structure to hold all the object info
+        struct obj_t{
+            //Data for object loaded from file
+            std::vector<vmath::vec4> vertices;
+            std::vector<vmath::vec4> normals;
+            std::vector<vmath::vec2> uv;
+            vmath::vec3 scale;
+            vmath::vec3 world_origin;
+            vmath::vec2 max; //maximum x and z values
+            vmath::vec2 min; //minimum x and z values
+            GLuint vertNum; //This should be the same as vertivies.size()
+
+            //Handle from OpenGL set up
+            GLuint vertices_buffer_ID;        
+
+            //Object to World transforms
+            vmath::mat4 obj2world;
+        };
+
+        //Hold all of our objects
+        std::vector<obj_t> objects;
+
+
+
+        //Data for Skycube
+        GLuint sc_program; //Program refernce
+
+        GLuint sc_vertex_array_object;
+        GLuint sc_map_texture;
+
+        //TODO:: Rename these better names
+        GLuint sc_Camera;
+        GLuint sc_Perspective;
+
+        std::vector<vmath::vec4> skycube_vertices; //List of skycube vertexes
+
+        //decide how fast camera should translate/rotate on keypresses
+        GLfloat move_speed;
+        GLfloat pan_speed;
+
+        GLfloat pitch;
+        GLfloat yaw;
+
+        GLint last_x;
+        GLint last_y;
+        bool first_mouse;
+
+        bool autoRotate = false;
+
+        // Camera Stuff
+        struct camera_t{ //Keep all of our camera stuff together
+            bool collision;
+            float camera_near;   //Near clipping mask
+            float camera_far;    //Far clipping mask
+            float fovy;          //Field of View in y
+            float aspect;        //Aspect ratio (w/h)
+            float pitch;
+            float yaw;
+            vmath::mat4 proj_Matrix; //Collection of the above
+
+            vmath::vec3 position; //Current world coordinates of the camera
+            vmath::vec3 forward; //unit vector of forward direction of the camera
+            vmath::vec3 up; //unit vector of up direction of the camera
+            //TODO:: Maybe we just want to use euler angles here
+
+            vmath::mat4 view_mat; //World to Camera matrix
+            vmath::mat4 view_mat_no_translation; //World to Camera matrix with no translation
+
+            vmath::vec3 advance(GLfloat move_speed){
+                return vmath::normalize(vmath::vec3(forward[0], 0.0f, forward[2])) * move_speed;
+            }
+
+            vmath::vec3 strafe(GLfloat move_speed){
+                vmath::vec3 direction = vmath::cross(forward, up);
+                return vmath::normalize(vmath::vec3(direction[0], 0.0f, direction[2])) * move_speed;
+            }
+        } camera;
+
+        //Utility to update project matrix and view matrix of a camera_t
+        void calcProjection(camera_t &cur){
+            cur.aspect = static_cast<float>(info.windowWidth) / static_cast<float>(info.windowHeight); //Maybe this will keep it updated?
+            cur.proj_Matrix = vmath::perspective(cur.fovy,cur.aspect, cur.camera_near, cur.camera_far);
+        }
+
+        void calcView(camera_t &cur){
+
+            cur.view_mat = vmath::lookat(cur.position, autoRotate ? vmath::vec3(0.0f, 0.0f, 0.0f) : cur.position + cur.forward, vmath::vec3(0.0f, 1.0f, 0.0f)); //Based on position and focus location
+            cur.view_mat_no_translation = cur.view_mat;   
+            //Removing the tranlational elements for skybox         
+            cur.view_mat_no_translation[3][0] = 0;
+            cur.view_mat_no_translation[3][1] = 0;
+            cur.view_mat_no_translation[3][2] = 0;
+        }
 
     public:
 
@@ -59,16 +166,22 @@ class test_app : public sb7::application{
 
         //Also notice this could be automated / streamlined with a list of objects to load
 
-        int num_cubes = 4;
 
-        for(int i = 0; i < num_cubes; i++){
-            // generate new cube
-            objects.push_back(obj_t());
-            load_obj(".\\bin\\media\\cube.obj", objects[i].vertices, objects[i].uv, objects[i].normals, objects[i].vertNum);
+        for (unsigned x = 0; x < MazeWidth; x++){
+            for (unsigned y = 0; y < MazeHeight; y++){
+                //flatten to 1D index
+                unsigned i = (x * MazeWidth) + y;
+                // generate new cube
+                objects.push_back(obj_t());
+                load_obj(".\\bin\\media\\cube_small.obj", objects[i].vertices, objects[i].uv, objects[i].normals, objects[i].vertNum);
 
-            //test place in line
-            objects[i].world_origin = vmath::vec3(static_cast<float>(2 * i), 0.0f, 0.0f);
+                //test place in line
+                objects[i].world_origin = vmath::vec3(static_cast<float>(x), 0.0f, static_cast<float>(y));
+                objects[i].scale = vmath::vec3(1.0f, 1.0f, 1.0f);
+                // level.push_back({ vmath::vec3(x, 0, y), vmath::vec3(1) });
+            }
         }
+        
 
         ////////////////////////////////
         //Set up Object Scene Shaders //
@@ -93,6 +206,16 @@ class test_app : public sb7::application{
         glUseProgram(rendering_program); //TODO:: This might not be necessary (because of the above link_from_shaders)
         glCreateVertexArrays(1,&vertex_array_object);
         glBindVertexArray(vertex_array_object);
+
+        std::srand(std::time(nullptr));
+
+        std::vector<vmath::vec3> initMaze = GenerateMaze();
+        initMaze.erase(std::remove(initMaze.begin(), initMaze.end(), vmath::vec3(0, 0, 1)), initMaze.end());
+        initMaze.erase(std::remove(initMaze.begin(), initMaze.end(), vmath::vec3(MazeWidth - 1, MazeHeight - 1, 3)), initMaze.end());
+        std::vector<obj_t> maze = convertMazeToWorld(initMaze);
+        //insert into objects and build
+        objects.reserve(objects.size() + maze.size());
+        objects.insert(objects.end(), maze.begin(), maze.end());
 
         for(int i = 0; i < objects.size(); i++){
             //For each object in objects, set up openGL buffers
@@ -191,6 +314,7 @@ class test_app : public sb7::application{
         /////////////////////
         // Camera Creation //
         /////////////////////
+        camera.collision = true;   //enable collision
         camera.camera_near = 0.1f; //Near Clipping Plane
         camera.camera_far = 100.0f; //Far Clipping Plane
         camera.fovy       = 67.0f; //Field of view in the y direction (x defined by aspect)
@@ -302,6 +426,36 @@ class test_app : public sb7::application{
         runtime_error_check(4);
     }
 
+    std::vector<obj_t> convertMazeToWorld(std::vector<vmath::vec3> maze){
+        std::vector<obj_t> result;
+
+        for (unsigned i = 0; i < maze.size(); i++) {
+            result.push_back(obj_t());
+            load_obj(".\\bin\\media\\cube.obj", result[i].vertices, result[i].uv, result[i].normals, result[i].vertNum);
+
+            switch ((unsigned)maze[i][3]) {
+                case 0:
+                    result[i].world_origin = vmath::vec3(maze[i][0] - 0.5f + WallSize / 2.0f, 1.0f, maze[i][1]);
+                    result[i].scale = vmath::vec3(WallSize, 1.0f, 1.0f);
+                    break;
+                case 1:
+                    result[i].world_origin = vmath::vec3(maze[i][0], 1, maze[i][1] - 0.5f + WallSize / 2);
+                    result[i].scale = vmath::vec3(1.0f, 1.0f, WallSize);
+                    break;
+                case 2:
+                    result[i].world_origin = vmath::vec3(maze[i][0] + 0.5f - WallSize / 2, 1, maze[i][1]);
+                    result[i].scale = vmath::vec3(WallSize, 1.0f, 1.0f);
+                    break;
+                case 3:
+                    result[i].world_origin = vmath::vec3(maze[i][0], 1, maze[i][1] + 0.5f - WallSize / 2);
+                    result[i].scale = vmath::vec3(1.0f, 1.0f, WallSize);
+                    break;
+            }
+        }
+
+        return result;
+    }
+
     void drawSkyCube(double curTime){
 
         glDepthMask( GL_FALSE ); //Used to force skybox 'into' the back, making sure everything is rendered over it
@@ -376,7 +530,7 @@ class test_app : public sb7::application{
             float min_z = objects[i].min[1] + objects[i].world_origin[2];
             float max_z = objects[i].max[1] + objects[i].world_origin[2];
             if(((dest_x) < max_x + player_width) && (dest_x > min_x - player_width) && 
-                ((dest_z) < max_z + player_width) && (dest_z > min_z - player_width)) { //if x + z collides
+                ((dest_z) < max_z + player_width) && (dest_z > min_z - player_width) && camera.collision) { //if x + z collides
                 collides = true; 
                 break;
             }
@@ -409,6 +563,9 @@ class test_app : public sb7::application{
                 case 'Z': //Reset
                     camera.position = vmath::vec3(0.0f, 0.0f, 5.0f); //Starting camera at position (0,0,5)
                     // camera.focus = vmath::vec3(0.0f, 0.0f, 0.0f); //Camera is looking in the +y direction
+                    break;
+                case 'N':
+                    camera.collision = !camera.collision;
                     break;
                 case 'X': //Info
                     char buf[50];
@@ -489,111 +646,6 @@ class test_app : public sb7::application{
             glDeleteShader(shader); // Don't leak the shader.
         }
     }
-
-    private:
-        //Scene Rendering Information
-        GLuint rendering_program; //Program reference for scene generation
-        GLuint vertex_array_object;
-        
-        //Uniform attributes for Scene Render
-        GLuint transform_ID; //Dynamic transform of object
-        GLuint perspec_ID;   //Perspective transform
-        GLuint toCam_ID;     //World to Camera transform
-        GLuint vertex_ID;    //This will be mapped to different objects as we load them
-
-        //Structure to hold all the object info
-        struct obj_t{
-            //Data for object loaded from file
-            std::vector<vmath::vec4> vertices;
-            std::vector<vmath::vec4> normals;
-            std::vector<vmath::vec2> uv;
-            vmath::vec3 world_origin;
-            vmath::vec2 max; //maximum x and z values
-            vmath::vec2 min; //minimum x and z values
-            GLuint vertNum; //This should be the same as vertivies.size()
-
-            //Handle from OpenGL set up
-            GLuint vertices_buffer_ID;        
-
-            //Object to World transforms
-            vmath::mat4 obj2world;
-        };
-
-        //Hold all of our objects
-        std::vector<obj_t> objects;
-
-
-
-        //Data for Skycube
-        GLuint sc_program; //Program refernce
-
-        GLuint sc_vertex_array_object;
-        GLuint sc_map_texture;
-
-        //TODO:: Rename these better names
-        GLuint sc_Camera;
-        GLuint sc_Perspective;
-
-        std::vector<vmath::vec4> skycube_vertices; //List of skycube vertexes
-
-        //decide how fast camera should translate/rotate on keypresses
-        GLfloat move_speed;
-        GLfloat pan_speed;
-
-        GLfloat pitch;
-        GLfloat yaw;
-
-        GLint last_x;
-        GLint last_y;
-        bool first_mouse;
-
-        bool autoRotate = false;
-
-        // Camera Stuff
-        struct camera_t{ //Keep all of our camera stuff together
-            float camera_near;   //Near clipping mask
-            float camera_far;    //Far clipping mask
-            float fovy;          //Field of View in y
-            float aspect;        //Aspect ratio (w/h)
-            float pitch;
-            float yaw;
-            vmath::mat4 proj_Matrix; //Collection of the above
-
-            vmath::vec3 position; //Current world coordinates of the camera
-            vmath::vec3 forward; //unit vector of forward direction of the camera
-            vmath::vec3 up; //unit vector of up direction of the camera
-            //TODO:: Maybe we just want to use euler angles here
-
-            vmath::mat4 view_mat; //World to Camera matrix
-            vmath::mat4 view_mat_no_translation; //World to Camera matrix with no translation
-
-            vmath::vec3 advance(GLfloat move_speed){
-                return vmath::normalize(vmath::vec3(forward[0], 0.0f, forward[2])) * move_speed;
-            }
-
-            vmath::vec3 strafe(GLfloat move_speed){
-                vmath::vec3 direction = vmath::cross(forward, up);
-                return vmath::normalize(vmath::vec3(direction[0], 0.0f, direction[2])) * move_speed;
-            }
-        } camera;
-
-        //Utility to update project matrix and view matrix of a camera_t
-        void calcProjection(camera_t &cur){
-            cur.aspect = static_cast<float>(info.windowWidth) / static_cast<float>(info.windowHeight); //Maybe this will keep it updated?
-            cur.proj_Matrix = vmath::perspective(cur.fovy,cur.aspect, cur.camera_near, cur.camera_far);
-        }
-
-        void calcView(camera_t &cur){
-
-            cur.view_mat = vmath::lookat(cur.position, autoRotate ? vmath::vec3(0.0f, 0.0f, 0.0f) : cur.position + cur.forward, vmath::vec3(0.0f, 1.0f, 0.0f)); //Based on position and focus location
-            cur.view_mat_no_translation = cur.view_mat;   
-            //Removing the tranlational elements for skybox         
-            cur.view_mat_no_translation[3][0] = 0;
-            cur.view_mat_no_translation[3][1] = 0;
-            cur.view_mat_no_translation[3][2] = 0;
-        }
-
-
 };
 
 
