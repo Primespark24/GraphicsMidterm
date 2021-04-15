@@ -43,6 +43,7 @@ add_library(sb7
             src/functions/loadingFunctions.cpp
             src/functions/skybox.cpp
             src/functions/vectorFunctions.cpp
+            src/functions/maze.cpp
 )
 
 set(RUN_DIR ${PROJECT_SOURCE_DIR}/bin)
