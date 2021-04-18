@@ -15,7 +15,7 @@
 
  * You should have received a copy of the GNU General Public License
  * along with Maze 3D.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  * Edited by Kyle Shepard and Brycen Martin
  * changes include converting changing over from glm to vmath
  */
@@ -49,22 +49,50 @@ static std::vector<vmath::vec2> getUnvisitedNeighbors(vmath::vec2 pos, bool cell
     return result;
 }
 
-static void removeWall(vmath::vec2 currentCell, vmath::vec2 newCell, std::vector<vmath::vec3>& walls)
+/**
+ * removes necessary walls
+ * @param currentCell cell we were just now in
+ * @param newCell cell we are travelling to
+ * @param walls list of walls passed by reference
+ */
+static bool removeWall(vmath::vec2 currentCell, vmath::vec2 newCell, std::vector<vmath::vec3>& walls)
 {
+    int size = walls.size();
     auto remove = [&](unsigned wall, unsigned second)
     {
-        walls.erase(std::remove(walls.begin(), walls.end(), vmath::vec3(currentCell[0], currentCell[1], wall)), walls.end());
-        walls.erase(std::remove(walls.begin(), walls.end(), vmath::vec3(newCell[0], newCell[1], second)), walls.end());
+        for (auto iter = walls.cbegin(); iter < walls.cend(); /*iter++*/)
+        {
+            vmath::vec3 vec = *iter;
+            if (
+                (vec[0] == currentCell[0] && vec[1] == currentCell[1] and vec[2] == wall) ||
+                (vec[0] == newCell[0] && vec[1] == newCell[1] and vec[2] == wall))
+            {
+                iter = walls.erase(iter);
+            }
+            else
+            {
+                ++iter;
+            }
+}
+        // walls.erase(std::remove(walls.begin(), walls.end(), vmath::vec3(currentCell[0], currentCell[1], wall)), walls.end());
+        // walls.erase(std::remove(walls.begin(), walls.end(), vmath::vec3(newCell[0], newCell[1], second)), walls.end());
     };
 
-    if (newCell[0] < currentCell[0])
+    if (newCell[0] < currentCell[0]){
         remove(0, 2);
-    else if (newCell[0] > currentCell[0])
+    }
+    else if (newCell[0] > currentCell[0]){
         remove(2, 0);
-    if (newCell[1] < currentCell[1])
+    }
+    if (newCell[1] < currentCell[1]){
         remove(1, 3);
-    else if (newCell[1] > currentCell[1])
+    }
+    else if (newCell[1] > currentCell[1]){
         remove(3, 1);
+    }
+
+    //return if removal was successful
+    return size > walls.size();
 }
 
 std::vector<vmath::vec3> GenerateMaze()
@@ -84,7 +112,9 @@ std::vector<vmath::vec3> GenerateMaze()
         if (neighbors.size() != 0) {
             vmath::vec2 newCell = neighbors[std::rand() % neighbors.size()];
             used.push(currentCell);
-            removeWall(currentCell, newCell, walls);
+            if(!removeWall(currentCell, newCell, walls)){
+                // int y = 7/0; // force a crash
+            }
             currentCell = newCell;
             cells[(int)currentCell[1]][(int)currentCell[0]] = true;
             visitedCells++;

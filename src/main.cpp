@@ -1,11 +1,11 @@
 /*
  * Kyle Shepard and Brycen Martin
- * 
+ *
  * Midterm Project - MC Maze
- * 
+ *
  * Based on work by Graham Sellers and OpenGL SuperBible7 and Scott Griffith
  * Also: https://en.wikibooks.org/wiki/OpenGL_Programming/Modern_OpenGL_Tutorial_Load_OBJ
- *       http://www.opengl-tutorial.org/beginners-tutorials/tutorial-7-model-loading/ 
+ *       http://www.opengl-tutorial.org/beginners-tutorials/tutorial-7-model-loading/
  *       https://antongerdelan.net/opengl/cubemaps.html
  *       https://learnopengl.com/Getting-started/Camera
  */
@@ -38,7 +38,7 @@ class test_app : public sb7::application{
         //Scene Rendering Information
         GLuint rendering_program; //Program reference for scene generation
         GLuint vertex_array_object;
-        
+
         //Uniform attributes for Scene Render
         GLuint transform_ID; //Dynamic transform of object
         GLuint perspec_ID;   //Perspective transform
@@ -53,12 +53,12 @@ class test_app : public sb7::application{
             std::vector<vmath::vec2> uv;
             vmath::vec3 scale;
             vmath::vec3 world_origin;
-            vmath::vec2 max; //maximum x and z values
-            vmath::vec2 min; //minimum x and z values
+            vmath::vec3 max; //maximum x, y, and z values for bounding box
+            vmath::vec3 min; //minimum x, y, and z values for bounding box
             GLuint vertNum; //This should be the same as vertivies.size()
 
             //Handle from OpenGL set up
-            GLuint vertices_buffer_ID;        
+            GLuint vertices_buffer_ID;
 
             //Object to World transforms
             vmath::mat4 obj2world;
@@ -108,7 +108,6 @@ class test_app : public sb7::application{
             vmath::vec3 position; //Current world coordinates of the camera
             vmath::vec3 forward; //unit vector of forward direction of the camera
             vmath::vec3 up; //unit vector of up direction of the camera
-            //TODO:: Maybe we just want to use euler angles here
 
             vmath::mat4 view_mat; //World to Camera matrix
             vmath::mat4 view_mat_no_translation; //World to Camera matrix with no translation
@@ -132,8 +131,8 @@ class test_app : public sb7::application{
         void calcView(camera_t &cur){
 
             cur.view_mat = vmath::lookat(cur.position, autoRotate ? vmath::vec3(0.0f, 0.0f, 0.0f) : cur.position + cur.forward, vmath::vec3(0.0f, 1.0f, 0.0f)); //Based on position and focus location
-            cur.view_mat_no_translation = cur.view_mat;   
-            //Removing the tranlational elements for skybox         
+            cur.view_mat_no_translation = cur.view_mat;
+            //Removing the tranlational elements for skybox
             cur.view_mat_no_translation[3][0] = 0;
             cur.view_mat_no_translation[3][1] = 0;
             cur.view_mat_no_translation[3][2] = 0;
@@ -143,45 +142,36 @@ class test_app : public sb7::application{
 
     void init(){
         // Set up appropriate title
-        static const char title[] = "Collision Test";
+        static const char title[] = "A Maze-ing";
         sb7::application::init();
         memcpy(info.title, title, sizeof(title));
 
-        info.windowWidth = 1600; //Make sure things are square to start with
+        //16:9 aspect ratio
+        info.windowWidth = 1600;
         info.windowHeight = 900;
     }
-    
+
     void startup(){
         //////////////////////
         // Load Object Info //
         //////////////////////
-         //Push one new object into the vector list
-        // objects.push_back(obj_t()); //Push second new object into the vector list
-        // objects.push_back(obj_t()); //Push third new object into the vector list
-        // objects.push_back(obj_t()); //Push fourth new object into the vector list
-        // This program is set up to load multiple *different* objects
-        // If you wanted to decouple the data for objects from the transforms for object, it would be beneficial to 
-        // have two cooperative structs. One would hold the vertex data, the other would reference that data with 
-        // individual transform infomation.
 
-        //Also notice this could be automated / streamlined with a list of objects to load
-
-
+        //create maze floor
         for (unsigned x = 0; x < MazeWidth; x++){
             for (unsigned y = 0; y < MazeHeight; y++){
                 //flatten to 1D index
                 unsigned i = (x * MazeWidth) + y;
                 // generate new cube
                 objects.push_back(obj_t());
-                load_obj(".\\bin\\media\\cube_small.obj", objects[i].vertices, objects[i].uv, objects[i].normals, objects[i].vertNum);
+                load_obj(".\\bin\\media\\cube.obj", objects[i].vertices, objects[i].uv, objects[i].normals, objects[i].vertNum);
 
                 //test place in line
-                objects[i].world_origin = vmath::vec3(static_cast<float>(x), 0.0f, static_cast<float>(y));
-                objects[i].scale = vmath::vec3(1.0f, 1.0f, 1.0f);
+                objects[i].world_origin = vmath::vec3(static_cast<float>(x), -1.0f, static_cast<float>(y));
+                objects[i].scale = vmath::vec3(0.5f, 0.5f, 0.5f);
                 // level.push_back({ vmath::vec3(x, 0, y), vmath::vec3(1) });
             }
         }
-        
+
 
         ////////////////////////////////
         //Set up Object Scene Shaders //
@@ -212,6 +202,9 @@ class test_app : public sb7::application{
         std::vector<vmath::vec3> initMaze = GenerateMaze();
         initMaze.erase(std::remove(initMaze.begin(), initMaze.end(), vmath::vec3(0, 0, 1)), initMaze.end());
         initMaze.erase(std::remove(initMaze.begin(), initMaze.end(), vmath::vec3(MazeWidth - 1, MazeHeight - 1, 3)), initMaze.end());
+        // std::ostringstream oss;
+        // oss << initMaze.size();
+        // errorBoxString(oss.str());
         std::vector<obj_t> maze = convertMazeToWorld(initMaze);
         //insert into objects and build
         objects.reserve(objects.size() + maze.size());
@@ -224,15 +217,18 @@ class test_app : public sb7::application{
             glBufferData( GL_ARRAY_BUFFER,
                 objects[i].vertices.size() * sizeof(objects[i].vertices[0]), //Size of element * number of elements
                 objects[i].vertices.data(),                                   //Actual data
-                GL_STATIC_DRAW);                                               //Set to static draw (read only)  
+                GL_STATIC_DRAW);                                               //Set to static draw (read only)
 
             //calculate and store bounding box
             std::vector<float> xs;
+            std::vector<float> ys;
             std::vector<float> zs;
 
             for(int j = 0; j < objects[i].vertices.size(); j++){
-                xs.push_back(objects[i].vertices[j][0]);
-                zs.push_back(objects[i].vertices[j][2]);
+                vmath::vec4 vertex = objects[i].vertices[j] * vmath::scale(objects[i].scale);
+                xs.push_back(vertex[0]);
+                ys.push_back(vertex[1]);
+                zs.push_back(vertex[2]);
             }
 
             //check vector contents
@@ -240,18 +236,19 @@ class test_app : public sb7::application{
             // errorBoxString(toString(zs));
 
             std::tuple<float, float> xMinMax = minMax(xs);
+            std::tuple<float, float> yMinMax = minMax(ys);
             std::tuple<float, float> zMinMax = minMax(zs);
 
             // std::ostringstream oss;
             // oss << std::get<1>(xMinMax);
             // errorBoxString(oss.str());
 
-            objects[i].min = vmath::vec2(std::get<0>(xMinMax), std::get<0>(zMinMax));
-            objects[i].max = vmath::vec2(std::get<1>(xMinMax), std::get<1>(zMinMax));
-            
+            objects[i].min = vmath::vec3(std::get<0>(xMinMax), std::get<0>(yMinMax), std::get<0>(zMinMax));
+            objects[i].max = vmath::vec3(std::get<1>(xMinMax), std::get<1>(yMinMax), std::get<1>(zMinMax));
+
             //If we needed to load the UVs or Normals, this would be where.
         }
-        
+
         GL_CHECK_ERRORS
         ////////////////////////////////////
         // Grab IDs for rendering program //
@@ -290,8 +287,8 @@ class test_app : public sb7::application{
         glBufferData( GL_ARRAY_BUFFER,
                 skycube_vertices.size() * sizeof(skycube_vertices[0]), //Size of element * number of elements
                 skycube_vertices.data(),                               //Actual data
-                GL_STATIC_DRAW);                                       //Set to static draw (read only)  
-        
+                GL_STATIC_DRAW);                                       //Set to static draw (read only)
+
         glGenVertexArrays(1, &sc_vertex_array_object); // Get ID for skycube vao
         glBindVertexArray(sc_vertex_array_object);
         glEnableVertexAttribArray(0); //Enable Vertex Attribute Array
@@ -319,14 +316,14 @@ class test_app : public sb7::application{
         camera.camera_far = 100.0f; //Far Clipping Plane
         camera.fovy       = 67.0f; //Field of view in the y direction (x defined by aspect)
         //Initial camera details
-        camera.position = vmath::vec3(0.0f, 0.0f, 5.0f); //Starting camera at position (0,0,5)
+        camera.position = vmath::vec3(0.0f, 0.5f, 5.0f); //Starting camera at position (0,0,5)
         camera.forward = vmath::vec3(0.0f, 0.0f, -1.0f); //Camera is looking at origin
         camera.up = vmath::vec3(0.0f, 1.0f, 0.0f); //Camera is looking at origin
         pitch = 0.0f;
         yaw = -90.0f;
 
-        
-        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED); 
+
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
         move_speed = 0.2f;
         pan_speed = 0.2f;
@@ -391,14 +388,14 @@ class test_app : public sb7::application{
         /////////////////////////////////////////////////////////////////////////////////
 
         //Set up obj->world transforms for each object (these could be modified for animation)
-        
+
         // objects[0].world_origin = vmath::vec3(static_cast<float>(cos(curTime)), 0.0f, static_cast<float>(sin(curTime)));
-        
+
 
         for(int i = 0; i < objects.size(); i++ ){
-            objects[i].obj2world = 
-                vmath::mat4::identity() * 
-                vmath::translate(objects[i].world_origin);
+            objects[i].obj2world =
+                vmath::translate(objects[i].world_origin) *
+                vmath::scale(objects[i].scale);
             //render loop, go through each object and render it!
             glUseProgram(rendering_program); //activate the render program
             glBindVertexArray(vertex_array_object); //Select base vao
@@ -426,6 +423,7 @@ class test_app : public sb7::application{
         runtime_error_check(4);
     }
 
+    //adapted from 3dmaze library
     std::vector<obj_t> convertMazeToWorld(std::vector<vmath::vec3> maze){
         std::vector<obj_t> result;
 
@@ -433,24 +431,26 @@ class test_app : public sb7::application{
             result.push_back(obj_t());
             load_obj(".\\bin\\media\\cube.obj", result[i].vertices, result[i].uv, result[i].normals, result[i].vertNum);
 
-            switch ((unsigned)maze[i][3]) {
+            //check orientation of wall
+            switch ((unsigned)maze[i][2]) {
                 case 0:
-                    result[i].world_origin = vmath::vec3(maze[i][0] - 0.5f + WallSize / 2.0f, 1.0f, maze[i][1]);
+                    result[i].world_origin = vmath::vec3(maze[i][0] - 0.5f + WallSize / 2.0f, 0.5f, maze[i][1]);
                     result[i].scale = vmath::vec3(WallSize, 1.0f, 1.0f);
                     break;
                 case 1:
-                    result[i].world_origin = vmath::vec3(maze[i][0], 1, maze[i][1] - 0.5f + WallSize / 2);
+                    result[i].world_origin = vmath::vec3(maze[i][0], 0.5f, maze[i][1] - 0.5f + WallSize / 2);
                     result[i].scale = vmath::vec3(1.0f, 1.0f, WallSize);
                     break;
                 case 2:
-                    result[i].world_origin = vmath::vec3(maze[i][0] + 0.5f - WallSize / 2, 1, maze[i][1]);
+                    result[i].world_origin = vmath::vec3(maze[i][0] + 0.5f - WallSize / 2, 0.5f, maze[i][1]);
                     result[i].scale = vmath::vec3(WallSize, 1.0f, 1.0f);
                     break;
                 case 3:
-                    result[i].world_origin = vmath::vec3(maze[i][0], 1, maze[i][1] + 0.5f - WallSize / 2);
+                    result[i].world_origin = vmath::vec3(maze[i][0], 0.5f, maze[i][1] + 0.5f - WallSize / 2);
                     result[i].scale = vmath::vec3(1.0f, 1.0f, WallSize);
                     break;
             }
+            result[i].scale *= vmath::vec3(0.5f, 1.0f, 0.5f);
         }
 
         return result;
@@ -475,7 +475,7 @@ class test_app : public sb7::application{
         info.windowWidth = w;
         info.windowHeight = h;
         //Recalculate the projection matrix used by camera
-        calcProjection(camera); 
+        calcProjection(camera);
     }
 
     //adapted from https://learnopengl.com/Getting-started/Camera
@@ -486,15 +486,14 @@ class test_app : public sb7::application{
             last_y = y;
             first_mouse = false;
         }
-    
+
         float xoffset = static_cast<float>(x - last_x);
-        float yoffset = static_cast<float>(last_y - y); 
+        float yoffset = static_cast<float>(last_y - y);
         last_x = x;
         last_y = y;
 
-        float sensitivity = 0.1f;
-        xoffset *= sensitivity;
-        yoffset *= sensitivity;
+        xoffset *= pan_speed;
+        yoffset *= pan_speed;
 
         yaw   += xoffset;
         pitch += yoffset;
@@ -503,7 +502,7 @@ class test_app : public sb7::application{
             pitch = 89.0f;
         if(pitch < -89.0f)
             pitch = -89.0f;
-        pitch = 0.0f; // filter out y so it doesn't look broken ;)
+        // pitch = 0.0f; // filter out y so it doesn't look broken ;)
         camera.forward = vmath::normalize(
             vmath::vec3(
                 cos(vmath::radians(yaw)) * cos(vmath::radians(pitch)),
@@ -519,19 +518,35 @@ class test_app : public sb7::application{
         //iterate through all walls
         vmath::vec3 dest = camera.position + direction;
         float dest_x = dest[0];
+        float dest_y = dest[1];
         float dest_z = dest[2];
 
         bool collides = false;
-        float player_width = 0.5f;
+        float player_width = 0.15f;
+        float player_height = 0.5f;
 
         for(int i = 0; i < objects.size(); i++){
+
             float min_x = objects[i].min[0] + objects[i].world_origin[0];
             float max_x = objects[i].max[0] + objects[i].world_origin[0];
-            float min_z = objects[i].min[1] + objects[i].world_origin[2];
-            float max_z = objects[i].max[1] + objects[i].world_origin[2];
-            if(((dest_x) < max_x + player_width) && (dest_x > min_x - player_width) && 
-                ((dest_z) < max_z + player_width) && (dest_z > min_z - player_width) && camera.collision) { //if x + z collides
-                collides = true; 
+            float min_y = objects[i].min[1] + objects[i].world_origin[1];
+            float max_y = objects[i].max[1] + objects[i].world_origin[1];
+            float min_z = objects[i].min[2] + objects[i].world_origin[2];
+            float max_z = objects[i].max[2] + objects[i].world_origin[2];
+
+            if(
+                ((dest_x) < max_x + player_width) && (dest_x > min_x - player_width) &&
+                ((dest_y) < max_y + player_height) && (dest_y > min_y - player_height) &&
+                ((dest_z) < max_z + player_width) && (dest_z > min_z - player_width) &&
+                camera.collision
+            ) { //if x + z collides
+                // char buf[150];
+                // sprintf(buf, "dest_x = %.3f, dest_y = %.3f, dest_z = %.3f\nmin_x = %.3f, max_x = %.3f, min_y = %.3f, max_y = %.3f, min_z = %.3f, max_z = %.3f",
+                //             dest_x, dest_y, dest_z,
+                //             min_x, max_x, min_y, max_y, min_z, max_z
+                //         );
+                // errorBox(buf);
+                collides = true;
                 break;
             }
         }
@@ -544,18 +559,24 @@ class test_app : public sb7::application{
         //If something did happen
         if (action) {
             switch (key) { //Select an action
-                case 'W': //go toward camera direction 
+                case 'W': //go toward camera direction
                     // camera.position += camera.advance(move_speed);
                     move(camera.advance(move_speed), 1);
                     break;
                 case 'A': //strafe left of camera direction
                     move(camera.strafe(move_speed), -1);
                     break;
-                case 'S': //back away from camera direction 
+                case 'S': //back away from camera direction
                     move(camera.advance(move_speed), -1);
                     break;
-                case 'D': //strafe right of camera direction 
+                case 'D': //strafe right of camera direction
                     move(camera.strafe(move_speed), 1);
+                    break;
+                case GLFW_KEY_UP:
+                    camera.position[1]++;
+                    break;
+                case GLFW_KEY_DOWN:
+                    camera.position[1]--;
                     break;
                 case 'C':
                     autoRotate = !autoRotate;
@@ -569,11 +590,11 @@ class test_app : public sb7::application{
                     break;
                 case 'X': //Info
                     char buf[50];
-                    sprintf(buf, "Current Camera Pos:(%.3f,%.3f,%.3f)\nForward:(%.3f,%.3f,%.3f)\nUp:(%.3f,%.3f,%.3f)\nPitch:%.3f Yaw:%.3f",
+                    sprintf(buf, "Current Camera Pos:(%.3f,%.3f,%.3f)\nForward:(%.3f,%.3f,%.3f)\nUp:(%.3f,%.3f,%.3f)\nPitch:%.3f Yaw:%.3f\nCollision Enabled:%d",
                                        camera.position[0],camera.position[1],camera.position[2],
                                        camera.forward[0],camera.forward[1],camera.forward[2],
                                        camera.up[0], camera.up[1], camera.up[2],
-                                       pitch, yaw
+                                       pitch, yaw, camera.collision
                                     );
                     MessageBoxA(NULL, buf, "Diagnostic Printout", MB_OK);
                     break;
@@ -612,7 +633,7 @@ class test_app : public sb7::application{
     void runtime_error_check(GLuint tracker = 0)
     {
         GLenum err = glGetError();
-        
+
         if (err) {
             char buf[50];
             sprintf(buf, "Error(%d) = %x", tracker, err);
