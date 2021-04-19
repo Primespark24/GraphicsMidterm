@@ -30,6 +30,6 @@
 constexpr unsigned MazeWidth = 10, MazeHeight = 10;
 constexpr float WallSize = 0.15f;
 static bool removeWall(vmath::vec2 currentCell, vmath::vec2 newCell, std::vector<vmath::vec3>& walls);
-std::vector<vmath::vec3> GenerateMaze();
+std::vector<vmath::vec3> GenerateMaze(vmath::vec2 &endpoint);
 
 #endif /* end of include guard: MAZE_H */

@@ -17,7 +17,8 @@
  * along with Maze 3D.  If not, see <http://www.gnu.org/licenses/>.
  *
  * Edited by Kyle Shepard and Brycen Martin
- * changes include converting changing over from glm to vmath
+ * changes include converting changing over from glm to vmath, replacing 
+ * wall removal algorithm, and adding feature for defining endpoint
  */
 
 #include "maze.h"
@@ -75,8 +76,6 @@ static bool removeWall(vmath::vec2 currentCell, vmath::vec2 newCell, std::vector
                 ++iter;
             }
         }
-        // walls.erase(std::remove(walls.begin(), walls.end(), vmath::vec3(currentCell[0], currentCell[1], wall)), walls.end());
-        // walls.erase(std::remove(walls.begin(), walls.end(), vmath::vec3(newCell[0], newCell[1], second)), walls.end());
     };
 
     if (newCell[0] < currentCell[0]){
@@ -96,7 +95,7 @@ static bool removeWall(vmath::vec2 currentCell, vmath::vec2 newCell, std::vector
     return size > walls.size();
 }
 
-std::vector<vmath::vec3> GenerateMaze()
+std::vector<vmath::vec3> GenerateMaze(vmath::vec2 &endpoint)
 {
     std::vector<vmath::vec3> walls;
     initWalls(walls);
@@ -107,6 +106,7 @@ std::vector<vmath::vec3> GenerateMaze()
     unsigned visitedCells = 1;
 
     std::stack<vmath::vec2> used;
+    int endDist = 0;
 
     while (visitedCells < MazeWidth * MazeHeight) {
         std::vector<vmath::vec2> neighbors = getUnvisitedNeighbors(currentCell, cells);
@@ -123,6 +123,12 @@ std::vector<vmath::vec3> GenerateMaze()
         else if (used.size() != 0) {
             currentCell = used.top();
             used.pop();
+        }
+
+        //if new longest path as found, set its current cell as the endpoint
+        if(used.size() > endDist){
+            endpoint = currentCell;
+            endDist = used.size();
         }
     }
 

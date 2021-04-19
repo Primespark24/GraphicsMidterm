@@ -6,6 +6,7 @@
 #include <iterator>
 #include <iostream>
 
+//calculate min and max and return as tuple of both
 std::tuple<float, float> minMax(std::vector<float> vec){
     if(vec.size() != 0){
         float min = vec.at(0);
@@ -23,6 +24,8 @@ std::tuple<float, float> minMax(std::vector<float> vec){
     return {};
 }
 
+
+//return vector as string using ostream per-element and an iterator
 std::string toString(std::vector<float> vec){
    
     if(vec.size() != 0){

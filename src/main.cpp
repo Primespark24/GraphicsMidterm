@@ -106,13 +106,13 @@ class test_app : public sb7::application{
 
         // Camera Stuff
         struct camera_t{ //Keep all of our camera stuff together
-            bool collision;
+            bool collision;      //true if we want to treat objects as solid
             float camera_near;   //Near clipping mask
             float camera_far;    //Far clipping mask
             float fovy;          //Field of View in y
             float aspect;        //Aspect ratio (w/h)
-            float pitch;
-            float yaw;
+            float pitch;         //degree we are looking up
+            float yaw;           //degree we are looking around
             vmath::mat4 proj_Matrix; //Collection of the above
 
             vmath::vec3 position; //Current world coordinates of the camera
@@ -139,7 +139,7 @@ class test_app : public sb7::application{
         }
 
         void calcView(camera_t &cur){
-
+            //replaced camera.focus with position plus forward vector for proper first-person camera
             cur.view_mat = vmath::lookat(cur.position, autoRotate ? vmath::vec3(0.0f, 0.0f, 0.0f) : cur.position + cur.forward, vmath::vec3(0.0f, 1.0f, 0.0f)); //Based on position and focus location
             cur.view_mat_no_translation = cur.view_mat;
             //Removing the tranlational elements for skybox
@@ -161,6 +161,7 @@ class test_app : public sb7::application{
         info.windowHeight = 900;
     }
 
+    //load texture and assign id to be referenced by objects' texture_IDs
     void textureLoad(GLuint &texture_ID, unsigned char* loadedTextureData, unsigned int texWidth, unsigned int texHeight){
         //Assign Texture from CPU memory to GPU memory
             glGenTextures(1, &texture_ID);
@@ -179,12 +180,6 @@ class test_app : public sb7::application{
     }
 
     void startup(){
-        //////////////////////
-        // Load Object Info //
-        //////////////////////
-
-
-
 
         ////////////////////////////////
         //Set up Object Scene Shaders //
@@ -210,6 +205,10 @@ class test_app : public sb7::application{
         glCreateVertexArrays(1,&vertex_array_object);
         glBindVertexArray(vertex_array_object);
 
+        /////////////////
+        // Create Maze //
+        /////////////////
+
         //create maze floor
         for (unsigned x = 0; x < MazeWidth; x++){
             for (unsigned y = 0; y < MazeHeight; y++){
@@ -227,15 +226,12 @@ class test_app : public sb7::application{
         }
 
         //create maze walls
+        //seed maze
         std::srand(std::time(nullptr));
-
-        std::vector<vmath::vec3> initMaze = GenerateMaze();
-        std::ostringstream oss;
-        // initMaze.erase(std::remove(initMaze.begin(), initMaze.end(), vmath::vec3(0, 0, 1)), initMaze.end());
-        initMaze.erase(std::remove(initMaze.begin(), initMaze.end(), vmath::vec3(0, 0, 1)), initMaze.end());
-        // initMaze.erase(std::remove(initMaze.begin(), initMaze.end(), vmath::vec3(MazeWidth - 1, MazeHeight - 1, 3)), initMaze.end());
-        initMaze.erase(std::remove(initMaze.begin(), initMaze.end(), vmath::vec3(MazeWidth - 1, MazeHeight - 1, 3)), initMaze.end());
-        // errorBoxString(oss.str());
+        //generate maze using recursive backtracking and pass endpoint by reference to edit so it can be used later
+        vmath::vec2 endpoint(0,0);
+        std::vector<vmath::vec3> initMaze = GenerateMaze(endpoint);
+        //pass set of walls to function and generate 3D walls to divide cells
         std::vector<obj_t> maze = convertMazeToWorld(initMaze);
         //insert into objects and build
         objects.reserve(objects.size() + maze.size());
@@ -261,11 +257,7 @@ class test_app : public sb7::application{
         load_BMP(".\\bin\\media\\block_textures\\diamond_block.bmp", endTextureData, endTexWidth, endTexHeight);
         load_BMP(".\\bin\\media\\block_textures\\brick.bmp", wallTextureData, wallTexWidth, wallTexHeight);
 
-        floorTex = 4566;
-        startTex = 4567;
-        endTex = 4568;
-        wallTex = 4569;
-
+        //load all textures and store under ids to be referenced by objects
         textureLoad(floorTex, floorTextureData, floorTexWidth, floorTexHeight);
         textureLoad(startTex, startTextureData, startTexWidth, startTexHeight);
         textureLoad(endTex, endTextureData, endTexWidth, endTexHeight);
@@ -289,39 +281,33 @@ class test_app : public sb7::application{
                 objects[i].uv.data(),                            //Actual data
                 GL_STATIC_DRAW);
 
-            //temporary texture data
-            // unsigned char* loadedTextureData;
-            // unsigned int texWidth;
-            // unsigned int texHeight;
-
             if(i < MazeHeight * MazeWidth){ //the first m*n cubes are floor cubes
-                if(false){ //starting point, set to stone
-
-                } else if (false){ //endpoint, set to dimamond block
-
+                if( //starting point, set to stone
+                    objects[i].world_origin[0] == 0.0f &&
+                    objects[i].world_origin[1] == -1.0f &&
+                    objects[i].world_origin[2] == 0.0f
+                ){ 
+                    objects[i].texture_ID = startTex;
+                } else if ( //endpoint, set to dimamond block
+                    objects[i].world_origin[0] == endpoint[0] &&
+                    objects[i].world_origin[1] == -1.0f &&
+                    objects[i].world_origin[2] == endpoint[1]
+                ){ 
+                    objects[i].texture_ID = endTex;
                 } else { //default, set to bedrock
                     objects[i].texture_ID = floorTex;
-                    // textureLoad(objects[i], floorTextureData, floorTexWidth, floorTexHeight);
-                    // loadedTextureData = floorTextureData;
-                    // texWidth = floorTexWidth;
-                    // texHeight = floorTexHeight;
                 }
             } else { //these are walls, set to brick
                 objects[i].texture_ID = wallTex;
-                // textureLoad(objects[i], wallTextureData, wallTexWidth, wallTexHeight);
-                // loadedTextureData = wallTextureData;
-                // texWidth = wallTexWidth;
-                // texHeight = wallTexHeight;
             }
-            // objects[i].texture_ID = floorTex;
-            //clear dynamic temporary memory
-            // delete[] loadedTextureData;
 
             //calculate and store bounding box
+            //create vectors to store all x, y, and z values
             std::vector<float> xs;
             std::vector<float> ys;
             std::vector<float> zs;
 
+            //populate using all vertices of object
             for(int j = 0; j < objects[i].vertices.size(); j++){
                 vmath::vec4 vertex = objects[i].vertices[j] * vmath::scale(objects[i].scale);
                 xs.push_back(vertex[0]);
@@ -329,21 +315,22 @@ class test_app : public sb7::application{
                 zs.push_back(vertex[2]);
             }
 
+            //calculate minimum and maximum values for each dimension
             std::tuple<float, float> xMinMax = minMax(xs);
             std::tuple<float, float> yMinMax = minMax(ys);
             std::tuple<float, float> zMinMax = minMax(zs);
 
+            //store min/max values in object as bounding box
             objects[i].min = vmath::vec3(std::get<0>(xMinMax), std::get<0>(yMinMax), std::get<0>(zMinMax));
             objects[i].max = vmath::vec3(std::get<1>(xMinMax), std::get<1>(yMinMax), std::get<1>(zMinMax));
         }
 
+        //give the OS back its memory
         delete[] floorTextureData;
         delete[] startTextureData;
         delete[] endTextureData;
         delete[] wallTextureData;
 
-        // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
         GL_CHECK_ERRORS
         ////////////////////////////////////
@@ -414,7 +401,7 @@ class test_app : public sb7::application{
         camera.camera_far = 100.0f; //Far Clipping Plane
         camera.fovy       = 67.0f; //Field of view in the y direction (x defined by aspect)
         //Initial camera details
-        camera.position = vmath::vec3(0.0f, 0.5f, 5.0f); //Starting camera at position (0,0,5)
+        camera.position = vmath::vec3(0.0f, 0.5f, 0.0f); //Starting camera at position (0,0,5)
         camera.forward = vmath::vec3(0.0f, 0.0f, -1.0f); //Camera is looking at origin
         camera.up = vmath::vec3(0.0f, 1.0f, 0.0f); //Camera is looking at origin
         pitch = 0.0f;
@@ -423,6 +410,7 @@ class test_app : public sb7::application{
 
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
+        //camera move/look speeds
         move_speed = 0.2f;
         pan_speed = 0.2f;
 
@@ -533,7 +521,7 @@ class test_app : public sb7::application{
         runtime_error_check(4);
     }
 
-    //adapted from 3dmaze library
+    //adapted from 3DMaze library, converts 2D maze and orientations in 3D objects in our world
     std::vector<obj_t> convertMazeToWorld(std::vector<vmath::vec3> maze){
         std::vector<obj_t> result;
 
@@ -541,26 +529,27 @@ class test_app : public sb7::application{
             result.push_back(obj_t());
             load_obj(".\\bin\\media\\bricky_cube.obj", result[i].vertices, result[i].uv, result[i].normals, result[i].vertNum);
 
-            //check orientation of wall
+            //check orientation of wall and scale sube and place where wall should be
             switch ((unsigned)maze[i][2]) {
                 case 0:
-                    result[i].world_origin = vmath::vec3(maze[i][0] - 0.5f + WallSize / 2.0f, 0.5f, maze[i][1]);
+                    result[i].world_origin = vmath::vec3(maze[i][0] - 0.5f + WallSize / 2.0f, 0.0f, maze[i][1]);
                     result[i].scale = vmath::vec3(WallSize, 1.0f, 1.0f);
                     break;
                 case 1:
-                    result[i].world_origin = vmath::vec3(maze[i][0], 0.5f, maze[i][1] - 0.5f + WallSize / 2);
+                    result[i].world_origin = vmath::vec3(maze[i][0], 0.0f, maze[i][1] - 0.5f + WallSize / 2);
                     result[i].scale = vmath::vec3(1.0f, 1.0f, WallSize);
                     break;
                 case 2:
-                    result[i].world_origin = vmath::vec3(maze[i][0] + 0.5f - WallSize / 2, 0.5f, maze[i][1]);
+                    result[i].world_origin = vmath::vec3(maze[i][0] + 0.5f - WallSize / 2, 0.0f, maze[i][1]);
                     result[i].scale = vmath::vec3(WallSize, 1.0f, 1.0f);
                     break;
                 case 3:
-                    result[i].world_origin = vmath::vec3(maze[i][0], 0.5f, maze[i][1] + 0.5f - WallSize / 2);
+                    result[i].world_origin = vmath::vec3(maze[i][0], 0.0f, maze[i][1] + 0.5f - WallSize / 2);
                     result[i].scale = vmath::vec3(1.0f, 1.0f, WallSize);
                     break;
             }
-            result[i].scale *= vmath::vec3(0.5f, 1.0f, 0.5f);
+            //scale wall by 0.5 to fit properly
+            result[i].scale *= vmath::vec3(0.5f, 0.5f, 0.5f);
         }
 
         return result;
@@ -590,6 +579,7 @@ class test_app : public sb7::application{
 
     //adapted from https://learnopengl.com/Getting-started/Camera
     void onMouseMove(int x, int y){
+        //if is first time mouse is polled
         if (first_mouse)
         {
             last_x = x;
@@ -597,22 +587,27 @@ class test_app : public sb7::application{
             first_mouse = false;
         }
 
+        //calculate distance mouse has moved while captured by windows
         float xoffset = static_cast<float>(x - last_x);
         float yoffset = static_cast<float>(last_y - y);
         last_x = x;
         last_y = y;
 
+        //pan camera by offset with set sensitivity
         xoffset *= pan_speed;
         yoffset *= pan_speed;
 
+        //modify Euler angles
         yaw   += xoffset;
         pitch += yoffset;
 
-        if(pitch > 89.0f)
-            pitch = 89.0f;
-        if(pitch < -89.0f)
-            pitch = -89.0f;
-        // pitch = 0.0f; // filter out y so it doesn't look broken ;)
+        //limit pitch value to avoid projection oddities
+        if(pitch > 39.0f)
+            pitch = 39.0f;
+        if(pitch < -39.0f)
+            pitch = -39.0f;
+
+        //normalize looking direction
         camera.forward = vmath::normalize(
             vmath::vec3(
                 cos(vmath::radians(yaw)) * cos(vmath::radians(pitch)),
@@ -635,6 +630,7 @@ class test_app : public sb7::application{
         float player_width = 0.15f;
         float player_height = 0.5f;
 
+        //check against all objects
         for(int i = 0; i < objects.size(); i++){
 
             float min_x = objects[i].min[0] + objects[i].world_origin[0];
@@ -644,23 +640,17 @@ class test_app : public sb7::application{
             float min_z = objects[i].min[2] + objects[i].world_origin[2];
             float max_z = objects[i].max[2] + objects[i].world_origin[2];
 
-            if(
+            if( //check if destination is possible by checking bounding boxes
                 ((dest_x) < max_x + player_width) && (dest_x > min_x - player_width) &&
                 ((dest_y) < max_y + player_height) && (dest_y > min_y - player_height) &&
                 ((dest_z) < max_z + player_width) && (dest_z > min_z - player_width) &&
                 camera.collision
-            ) { //if x + z collides
-                // char buf[150];
-                // sprintf(buf, "dest_x = %.3f, dest_y = %.3f, dest_z = %.3f\nmin_x = %.3f, max_x = %.3f, min_y = %.3f, max_y = %.3f, min_z = %.3f, max_z = %.3f",
-                //             dest_x, dest_y, dest_z,
-                //             min_x, max_x, min_y, max_y, min_z, max_z
-                //         );
-                // errorBox(buf);
+            ) { //if invalid move
                 collides = true;
                 break;
             }
         }
-        if(!collides){
+        if(!collides){ //update position if no collisions predicted
             camera.position += (direction * sign);
         }
     }
@@ -670,7 +660,6 @@ class test_app : public sb7::application{
         if (action) {
             switch (key) { //Select an action
                 case 'W': //go toward camera direction
-                    // camera.position += camera.advance(move_speed);
                     move(camera.advance(move_speed), 1);
                     break;
                 case 'A': //strafe left of camera direction
@@ -682,10 +671,10 @@ class test_app : public sb7::application{
                 case 'D': //strafe right of camera direction
                     move(camera.strafe(move_speed), 1);
                     break;
-                case GLFW_KEY_UP:
+                case GLFW_KEY_UP: //fly hacks, for debug and screenshots
                     camera.position[1]++;
                     break;
-                case GLFW_KEY_DOWN:
+                case GLFW_KEY_DOWN: //fly hacks, for debug and screenshots
                     camera.position[1]--;
                     break;
                 case 'C':
@@ -695,10 +684,10 @@ class test_app : public sb7::application{
                     camera.position = vmath::vec3(0.0f, 0.0f, 5.0f); //Starting camera at position (0,0,5)
                     // camera.focus = vmath::vec3(0.0f, 0.0f, 0.0f); //Camera is looking in the +y direction
                     break;
-                case 'N':
+                case 'N': //noclip mode, for walking through walls for debug purposes and screenshots
                     camera.collision = !camera.collision;
                     break;
-                case 'X': //Info
+                case 'X': //Info about position, look direction, and whether collision is enabled
                     char buf[50];
                     sprintf(buf, "Current Camera Pos:(%.3f,%.3f,%.3f)\nForward:(%.3f,%.3f,%.3f)\nUp:(%.3f,%.3f,%.3f)\nPitch:%.3f Yaw:%.3f\nCollision Enabled:%d",
                                        camera.position[0],camera.position[1],camera.position[2],
@@ -722,23 +711,24 @@ class test_app : public sb7::application{
 
     }
 
-    void errorBoxString(std::string str){
-        char buf[str.length()];
-        strcpy(buf, str.c_str());
-        MessageBoxA(NULL, buf, "Diagnostic Printout", MB_OK);
-    }
+    //used for debug output without writing the same code over agaain
+    // void errorBoxString(std::string str){
+    //     char buf[str.length()];
+    //     strcpy(buf, str.c_str());
+    //     MessageBoxA(NULL, buf, "Diagnostic Printout", MB_OK);
+    // }
 
-    void errorBox(const char* msg){
-        char buf[50];
-        strcpy(buf, msg);
-        // sprintf(buf, "Current Camera Pos:(%.3f,%.3f,%.3f)\nForward:(%.3f,%.3f,%.3f)\nUp:(%.3f,%.3f,%.3f)\nPitch:%.3f Yaw:%.3f",
-        //                     camera.position[0],camera.position[1],camera.position[2],
-        //                     camera.forward[0],camera.forward[1],camera.forward[2],
-        //                     camera.up[0], camera.up[1], camera.up[2],
-        //                     pitch, yaw
-        //                 );
-        MessageBoxA(NULL, buf, "Diagnostic Printout", MB_OK);
-    }
+    // void errorBox(const char* msg){
+    //     char buf[50];
+    //     strcpy(buf, msg);
+    //     // sprintf(buf, "Current Camera Pos:(%.3f,%.3f,%.3f)\nForward:(%.3f,%.3f,%.3f)\nUp:(%.3f,%.3f,%.3f)\nPitch:%.3f Yaw:%.3f",
+    //     //                     camera.position[0],camera.position[1],camera.position[2],
+    //     //                     camera.forward[0],camera.forward[1],camera.forward[2],
+    //     //                     camera.up[0], camera.up[1], camera.up[2],
+    //     //                     pitch, yaw
+    //     //                 );
+    //     MessageBoxA(NULL, buf, "Diagnostic Printout", MB_OK);
+    // }
 
     void runtime_error_check(GLuint tracker = 0)
     {
