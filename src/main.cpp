@@ -86,6 +86,11 @@ class test_app : public sb7::application{
 
         std::vector<vmath::vec4> skycube_vertices; //List of skycube vertexes
 
+        GLuint floorTex;
+        GLuint startTex;
+        GLuint endTex;
+        GLuint wallTex;
+
         //decide how fast camera should translate/rotate on keypresses
         GLfloat move_speed;
         GLfloat pan_speed;
@@ -156,10 +161,10 @@ class test_app : public sb7::application{
         info.windowHeight = 900;
     }
 
-    void func(obj_t &object, unsigned char* loadedTextureData, unsigned int texWidth, unsigned int texHeight){
+    void textureLoad(GLuint &texture_ID, unsigned char* loadedTextureData, unsigned int texWidth, unsigned int texHeight){
         //Assign Texture from CPU memory to GPU memory
-            glGenTextures(1, &object.texture_ID);
-            glBindTexture(GL_TEXTURE_2D, object.texture_ID);
+            glGenTextures(1, &texture_ID);
+            glBindTexture(GL_TEXTURE_2D, texture_ID);
             glTexImage2D( GL_TEXTURE_2D, //What kind of texture are we loading in
                                     0, // Level of detail, 0 base level
                                 GL_RGBA, // Internal (target) format of data, in this case Red, Gree, Blue, Alpha
@@ -169,6 +174,8 @@ class test_app : public sb7::application{
                                 GL_RGBA, //Format of input data (in this case we added the alpha when reading in data)
                     GL_UNSIGNED_BYTE, //Type of data being passed in
                         loadedTextureData); // Finally pointer to actual data to be passed in
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     }
 
     void startup(){
@@ -254,6 +261,16 @@ class test_app : public sb7::application{
         load_BMP(".\\bin\\media\\block_textures\\diamond_block.bmp", endTextureData, endTexWidth, endTexHeight);
         load_BMP(".\\bin\\media\\block_textures\\brick.bmp", wallTextureData, wallTexWidth, wallTexHeight);
 
+        floorTex = 4566;
+        startTex = 4567;
+        endTex = 4568;
+        wallTex = 4569;
+
+        textureLoad(floorTex, floorTextureData, floorTexWidth, floorTexHeight);
+        textureLoad(startTex, startTextureData, startTexWidth, startTexHeight);
+        textureLoad(endTex, endTextureData, endTexWidth, endTexHeight);
+        textureLoad(wallTex, wallTextureData, wallTexWidth, wallTexHeight);
+
         //load object buffers and textures, and calculate bounding cubes
         for(int i = 0; i < objects.size(); i++){
             //For each object in objects, set up openGL buffers
@@ -283,18 +300,20 @@ class test_app : public sb7::application{
                 } else if (false){ //endpoint, set to dimamond block
 
                 } else { //default, set to bedrock
-                    func(objects[i], floorTextureData, floorTexWidth, floorTexHeight);
+                    objects[i].texture_ID = floorTex;
+                    // textureLoad(objects[i], floorTextureData, floorTexWidth, floorTexHeight);
                     // loadedTextureData = floorTextureData;
                     // texWidth = floorTexWidth;
                     // texHeight = floorTexHeight;
                 }
             } else { //these are walls, set to brick
-                func(objects[i], wallTextureData, wallTexWidth, wallTexHeight);
+                objects[i].texture_ID = wallTex;
+                // textureLoad(objects[i], wallTextureData, wallTexWidth, wallTexHeight);
                 // loadedTextureData = wallTextureData;
                 // texWidth = wallTexWidth;
                 // texHeight = wallTexHeight;
             }
-
+            // objects[i].texture_ID = floorTex;
             //clear dynamic temporary memory
             // delete[] loadedTextureData;
 
@@ -323,8 +342,8 @@ class test_app : public sb7::application{
         delete[] endTextureData;
         delete[] wallTextureData;
 
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
         GL_CHECK_ERRORS
         ////////////////////////////////////
@@ -520,7 +539,7 @@ class test_app : public sb7::application{
 
         for (unsigned i = 0; i < maze.size(); i++) {
             result.push_back(obj_t());
-            load_obj(".\\bin\\media\\cube.obj", result[i].vertices, result[i].uv, result[i].normals, result[i].vertNum);
+            load_obj(".\\bin\\media\\bricky_cube.obj", result[i].vertices, result[i].uv, result[i].normals, result[i].vertNum);
 
             //check orientation of wall
             switch ((unsigned)maze[i][2]) {
