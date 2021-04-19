@@ -44,6 +44,7 @@ class test_app : public sb7::application{
         GLuint perspec_ID;   //Perspective transform
         GLuint toCam_ID;     //World to Camera transform
         GLuint vertex_ID;    //This will be mapped to different objects as we load them
+        GLuint uv_ID;
 
         // Structure to hold all the object info
         struct obj_t{
@@ -59,6 +60,7 @@ class test_app : public sb7::application{
 
             //Handle from OpenGL set up
             GLuint vertices_buffer_ID;
+            GLuint uv_buffer_ID;
 
             //Object to World transforms
             vmath::mat4 obj2world;
@@ -154,51 +156,26 @@ class test_app : public sb7::application{
         info.windowHeight = 900;
     }
 
+    void func(obj_t &object, unsigned char* loadedTextureData, unsigned int texWidth, unsigned int texHeight){
+        //Assign Texture from CPU memory to GPU memory
+            glGenTextures(1, &object.texture_ID);
+            glBindTexture(GL_TEXTURE_2D, object.texture_ID);
+            glTexImage2D( GL_TEXTURE_2D, //What kind of texture are we loading in
+                                    0, // Level of detail, 0 base level
+                                GL_RGBA, // Internal (target) format of data, in this case Red, Gree, Blue, Alpha
+                            texWidth, // Width of texture data (max is 1024, but maybe more)
+                            texHeight, // Height of texture data
+                                    0, //border (must be zero)
+                                GL_RGBA, //Format of input data (in this case we added the alpha when reading in data)
+                    GL_UNSIGNED_BYTE, //Type of data being passed in
+                        loadedTextureData); // Finally pointer to actual data to be passed in
+    }
+
     void startup(){
         //////////////////////
         // Load Object Info //
         //////////////////////
 
-        //Memory spaces for floor texture data
-        // unsigned char* loadedTextureData;
-        // unsigned int texWidth;
-        // unsigned int texHeight;
-
-        // // Load texture data from bitmap file to CPU memory
-        // load_BMP(".\\bin\\media\\block_textures\\bedrock.bmp",loadedTextureData,texWidth,texHeight);
-
-        //create maze floor
-        for (unsigned x = 0; x < MazeWidth; x++){
-            for (unsigned y = 0; y < MazeHeight; y++){
-                //flatten to 1D index
-                unsigned i = (x * MazeWidth) + y;
-                // generate new cube
-                objects.push_back(obj_t());
-                load_obj(".\\bin\\media\\cube.obj", objects[i].vertices, objects[i].uv, objects[i].normals, objects[i].vertNum);
-
-                //test place in line
-                objects[i].world_origin = vmath::vec3(static_cast<float>(x), -1.0f, static_cast<float>(y));
-                objects[i].scale = vmath::vec3(0.5f, 0.5f, 0.5f);
-
-                //Assign Texture from CPU memory to GPU memory
-                // glGenTextures(1,&objects[0].texture_ID);
-                // glBindTexture(GL_TEXTURE_2D, objects[0].texture_ID);
-                // glTexImage2D( GL_TEXTURE_2D, //What kind of texture are we loading in
-                //                         0, // Level of detail, 0 base level
-                //                     GL_RGBA, // Internal (target) format of data, in this case Red, Gree, Blue, Alpha
-                //                 texWidth, // Width of texture data (max is 1024, but maybe more)
-                //                 texHeight, // Height of texture data
-                //                         0, //border (must be zero)
-                //                     GL_RGBA, //Format of input data (in this case we added the alpha when reading in data)
-                //         GL_UNSIGNED_BYTE, //Type of data being passed in
-                //             loadedTextureData); // Finally pointer to actual data to be passed in
-                // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-                // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            }
-        }
-
-
-        // delete[] loadedTextureData;
 
 
 
@@ -226,22 +203,58 @@ class test_app : public sb7::application{
         glCreateVertexArrays(1,&vertex_array_object);
         glBindVertexArray(vertex_array_object);
 
+        //create maze floor
+        for (unsigned x = 0; x < MazeWidth; x++){
+            for (unsigned y = 0; y < MazeHeight; y++){
+                //flatten to 1D index
+                unsigned i = (x * MazeWidth) + y;
+                // generate new cube
+                objects.push_back(obj_t());
+                load_obj(".\\bin\\media\\cube.obj", objects[i].vertices, objects[i].uv, objects[i].normals, objects[i].vertNum);
+
+                //test place in line
+                objects[i].world_origin = vmath::vec3(static_cast<float>(x), -1.0f, static_cast<float>(y));
+                objects[i].scale = vmath::vec3(0.5f, 0.5f, 0.5f);
+
+            }
+        }
+
+        //create maze walls
         std::srand(std::time(nullptr));
 
         std::vector<vmath::vec3> initMaze = GenerateMaze();
         std::ostringstream oss;
-        oss << initMaze.size() << std::endl;
         // initMaze.erase(std::remove(initMaze.begin(), initMaze.end(), vmath::vec3(0, 0, 1)), initMaze.end());
         initMaze.erase(std::remove(initMaze.begin(), initMaze.end(), vmath::vec3(0, 0, 1)), initMaze.end());
         // initMaze.erase(std::remove(initMaze.begin(), initMaze.end(), vmath::vec3(MazeWidth - 1, MazeHeight - 1, 3)), initMaze.end());
         initMaze.erase(std::remove(initMaze.begin(), initMaze.end(), vmath::vec3(MazeWidth - 1, MazeHeight - 1, 3)), initMaze.end());
-        oss << initMaze.size();
         // errorBoxString(oss.str());
         std::vector<obj_t> maze = convertMazeToWorld(initMaze);
         //insert into objects and build
         objects.reserve(objects.size() + maze.size());
         objects.insert(objects.end(), maze.begin(), maze.end());
 
+        //Memory spaces for texture data
+        unsigned char* floorTextureData;
+        unsigned int floorTexWidth;
+        unsigned int floorTexHeight;
+        unsigned char* startTextureData;
+        unsigned int startTexWidth;
+        unsigned int startTexHeight;
+        unsigned char* endTextureData;
+        unsigned int endTexWidth;
+        unsigned int endTexHeight;
+        unsigned char* wallTextureData;
+        unsigned int wallTexWidth;
+        unsigned int wallTexHeight;
+
+        // Load texture data from bitmap file to CPU memory
+        load_BMP(".\\bin\\media\\block_textures\\bedrock.bmp", floorTextureData, floorTexWidth, floorTexHeight);
+        load_BMP(".\\bin\\media\\block_textures\\stone.bmp", startTextureData, startTexWidth, startTexHeight);
+        load_BMP(".\\bin\\media\\block_textures\\diamond_block.bmp", endTextureData, endTexWidth, endTexHeight);
+        load_BMP(".\\bin\\media\\block_textures\\brick.bmp", wallTextureData, wallTexWidth, wallTexHeight);
+
+        //load object buffers and textures, and calculate bounding cubes
         for(int i = 0; i < objects.size(); i++){
             //For each object in objects, set up openGL buffers
             glGenBuffers(1,&objects[i].vertices_buffer_ID); //Create the buffer id for this object
@@ -250,6 +263,40 @@ class test_app : public sb7::application{
                 objects[i].vertices.size() * sizeof(objects[i].vertices[0]), //Size of element * number of elements
                 objects[i].vertices.data(),                                   //Actual data
                 GL_STATIC_DRAW);                                               //Set to static draw (read only)
+
+            //Set up UV buffers
+            glGenBuffers(1,&objects[i].uv_buffer_ID); //Create the buffer id for this object
+            glBindBuffer( GL_ARRAY_BUFFER, objects[i].uv_buffer_ID);
+            glBufferData( GL_ARRAY_BUFFER,
+                objects[i].uv.size() * sizeof(objects[i].uv[0]), //Size of element * number of elements
+                objects[i].uv.data(),                            //Actual data
+                GL_STATIC_DRAW);
+
+            //temporary texture data
+            // unsigned char* loadedTextureData;
+            // unsigned int texWidth;
+            // unsigned int texHeight;
+
+            if(i < MazeHeight * MazeWidth){ //the first m*n cubes are floor cubes
+                if(false){ //starting point, set to stone
+
+                } else if (false){ //endpoint, set to dimamond block
+
+                } else { //default, set to bedrock
+                    func(objects[i], floorTextureData, floorTexWidth, floorTexHeight);
+                    // loadedTextureData = floorTextureData;
+                    // texWidth = floorTexWidth;
+                    // texHeight = floorTexHeight;
+                }
+            } else { //these are walls, set to brick
+                func(objects[i], wallTextureData, wallTexWidth, wallTexHeight);
+                // loadedTextureData = wallTextureData;
+                // texWidth = wallTexWidth;
+                // texHeight = wallTexHeight;
+            }
+
+            //clear dynamic temporary memory
+            // delete[] loadedTextureData;
 
             //calculate and store bounding box
             std::vector<float> xs;
@@ -263,23 +310,21 @@ class test_app : public sb7::application{
                 zs.push_back(vertex[2]);
             }
 
-            //check vector contents
-            // errorBoxString(toString(xs));
-            // errorBoxString(toString(zs));
-
             std::tuple<float, float> xMinMax = minMax(xs);
             std::tuple<float, float> yMinMax = minMax(ys);
             std::tuple<float, float> zMinMax = minMax(zs);
 
-            // std::ostringstream oss;
-            // oss << std::get<1>(xMinMax);
-            // errorBoxString(oss.str());
-
             objects[i].min = vmath::vec3(std::get<0>(xMinMax), std::get<0>(yMinMax), std::get<0>(zMinMax));
             objects[i].max = vmath::vec3(std::get<1>(xMinMax), std::get<1>(yMinMax), std::get<1>(zMinMax));
-
-            //If we needed to load the UVs or Normals, this would be where.
         }
+
+        delete[] floorTextureData;
+        delete[] startTextureData;
+        delete[] endTextureData;
+        delete[] wallTextureData;
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
         GL_CHECK_ERRORS
         ////////////////////////////////////
@@ -289,6 +334,8 @@ class test_app : public sb7::application{
         perspec_ID = glGetUniformLocation(rendering_program,"perspective");
         toCam_ID = glGetUniformLocation(rendering_program,"toCamera");
         vertex_ID = glGetAttribLocation(rendering_program,"obj_vertex");
+        uv_ID = glGetAttribLocation(rendering_program,"obj_uv");
+
 
         ///////////////////////////
         //Set up Skycube shaders //
@@ -432,6 +479,8 @@ class test_app : public sb7::application{
             glUseProgram(rendering_program); //activate the render program
             glBindVertexArray(vertex_array_object); //Select base vao
 
+            glBindTexture(GL_TEXTURE_2D, objects[i].texture_ID);
+
             //Copy over all the transforms
             glUniformMatrix4fv(transform_ID, 1,GL_FALSE, objects[i].obj2world); //Load in transform for this object
             //TODO::These might only need to be loaded once (for all objects)
@@ -444,6 +493,16 @@ class test_app : public sb7::application{
             glVertexAttribPointer( //Index into the buffer
                     vertex_ID, //Attribute in question
                     4,         //Number of elements per vertex call (vec4)
+                    GL_FLOAT,  //Type of element
+                    GL_FALSE,  //Normalize? Nope
+                    0,         //No stride (steps between indexes)
+                    0);       //initial offset
+
+            glEnableVertexAttribArray(uv_ID); //Recall the vertex ID
+            glBindBuffer(GL_ARRAY_BUFFER,objects[i].uv_buffer_ID);//Link object buffer to vertex_ID
+            glVertexAttribPointer( //Index into the buffer
+                    uv_ID, //Attribute in question
+                    2,         //Number of elements per vertex call (vec2)
                     GL_FLOAT,  //Type of element
                     GL_FALSE,  //Normalize? Nope
                     0,         //No stride (steps between indexes)
