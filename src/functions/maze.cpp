@@ -65,7 +65,8 @@ static bool removeWall(vmath::vec2 currentCell, vmath::vec2 newCell, std::vector
             vmath::vec3 vec = *iter;
             if (
                 (vec[0] == currentCell[0] && vec[1] == currentCell[1] and vec[2] == wall) ||
-                (vec[0] == newCell[0] && vec[1] == newCell[1] and vec[2] == wall))
+                (vec[0] == newCell[0] && vec[1] == newCell[1] and vec[2] == second)
+            )
             {
                 iter = walls.erase(iter);
             }
@@ -73,7 +74,7 @@ static bool removeWall(vmath::vec2 currentCell, vmath::vec2 newCell, std::vector
             {
                 ++iter;
             }
-}
+        }
         // walls.erase(std::remove(walls.begin(), walls.end(), vmath::vec3(currentCell[0], currentCell[1], wall)), walls.end());
         // walls.erase(std::remove(walls.begin(), walls.end(), vmath::vec3(newCell[0], newCell[1], second)), walls.end());
     };

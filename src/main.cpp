@@ -62,6 +62,9 @@ class test_app : public sb7::application{
 
             //Object to World transforms
             vmath::mat4 obj2world;
+
+            //Texture Info
+            GLuint texture_ID;
         };
 
         //Hold all of our objects
@@ -156,6 +159,14 @@ class test_app : public sb7::application{
         // Load Object Info //
         //////////////////////
 
+        //Memory spaces for floor texture data
+        // unsigned char* loadedTextureData;
+        // unsigned int texWidth;
+        // unsigned int texHeight;
+
+        // // Load texture data from bitmap file to CPU memory
+        // load_BMP(".\\bin\\media\\block_textures\\bedrock.bmp",loadedTextureData,texWidth,texHeight);
+
         //create maze floor
         for (unsigned x = 0; x < MazeWidth; x++){
             for (unsigned y = 0; y < MazeHeight; y++){
@@ -168,9 +179,27 @@ class test_app : public sb7::application{
                 //test place in line
                 objects[i].world_origin = vmath::vec3(static_cast<float>(x), -1.0f, static_cast<float>(y));
                 objects[i].scale = vmath::vec3(0.5f, 0.5f, 0.5f);
-                // level.push_back({ vmath::vec3(x, 0, y), vmath::vec3(1) });
+
+                //Assign Texture from CPU memory to GPU memory
+                // glGenTextures(1,&objects[0].texture_ID);
+                // glBindTexture(GL_TEXTURE_2D, objects[0].texture_ID);
+                // glTexImage2D( GL_TEXTURE_2D, //What kind of texture are we loading in
+                //                         0, // Level of detail, 0 base level
+                //                     GL_RGBA, // Internal (target) format of data, in this case Red, Gree, Blue, Alpha
+                //                 texWidth, // Width of texture data (max is 1024, but maybe more)
+                //                 texHeight, // Height of texture data
+                //                         0, //border (must be zero)
+                //                     GL_RGBA, //Format of input data (in this case we added the alpha when reading in data)
+                //         GL_UNSIGNED_BYTE, //Type of data being passed in
+                //             loadedTextureData); // Finally pointer to actual data to be passed in
+                // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+                // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
             }
         }
+
+
+        // delete[] loadedTextureData;
+
 
 
         ////////////////////////////////
@@ -200,10 +229,13 @@ class test_app : public sb7::application{
         std::srand(std::time(nullptr));
 
         std::vector<vmath::vec3> initMaze = GenerateMaze();
+        std::ostringstream oss;
+        oss << initMaze.size() << std::endl;
+        // initMaze.erase(std::remove(initMaze.begin(), initMaze.end(), vmath::vec3(0, 0, 1)), initMaze.end());
         initMaze.erase(std::remove(initMaze.begin(), initMaze.end(), vmath::vec3(0, 0, 1)), initMaze.end());
+        // initMaze.erase(std::remove(initMaze.begin(), initMaze.end(), vmath::vec3(MazeWidth - 1, MazeHeight - 1, 3)), initMaze.end());
         initMaze.erase(std::remove(initMaze.begin(), initMaze.end(), vmath::vec3(MazeWidth - 1, MazeHeight - 1, 3)), initMaze.end());
-        // std::ostringstream oss;
-        // oss << initMaze.size();
+        oss << initMaze.size();
         // errorBoxString(oss.str());
         std::vector<obj_t> maze = convertMazeToWorld(initMaze);
         //insert into objects and build
