@@ -5,10 +5,10 @@
 *
 * Based on work from:
 * Kent Jones, Whitworth
-* Dr. Anton Gerdelan, https://github.com/capnramses 
-*                     https://antongerdelan.net/opengl/cubemaps.html   
+* Dr. Anton Gerdelan, https://github.com/capnramses
+*                     https://antongerdelan.net/opengl/cubemaps.html
 *
-* Functions to help load and set up a skycube!              
+* Functions to help load and set up a skycube!
 */
 #pragma once
 
@@ -16,6 +16,7 @@
 #include <vector>  //Vertex holder
 #include <string>  //passing in file names
 #include <vmath.h> //Graphics utilities
+#include <loadingFunctions.h>
 
 //If you want more inspiring sky boxes: http://www.humus.name/index.php?page=Textures
 
@@ -53,9 +54,5 @@ void loadCubeTextures(std::string directory, GLuint texture_ID);
 //pulls in individual files data and assigns it to a specific texture maping
 // texture_ID -> GL handle for location of the texture
 // side       -> ex: GL_TEXTURE_CUBE_MAP_POSITIVE_X
-//               Which texture side is being uploaded 
+//               Which texture side is being uploaded
 void loadCubeSide(GLint texture_ID, GLenum side, std::string file);
-
-//Utility function to convert char (hopefully pulled from a binary file) to unsigned int
-//This is useful for converting header info inside of loadCubeSide
-unsigned int charToUInt(char * loc);
